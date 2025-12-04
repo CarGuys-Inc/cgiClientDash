@@ -22,7 +22,7 @@ export default function DashboardHeader({ accountId, navigation = [] }: Props) {
             <div className="justify-start items-center gap-x-4 lg:gap-x-6 hidden md:flex">
                 <div className="flex items-center gap-x-4">
                     <Link href="/">
-                    <h1>AppiTrak</h1>
+                    <h1>Welcome</h1>
                     </Link>
                     <span className="border-l rotate-12 h-6" />
                     <NavigatingAccountSelector accountId={accountId} />

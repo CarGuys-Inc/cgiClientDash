@@ -9,7 +9,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "AppiTrak",
+  title: "CarGuys Inc.",
   description: "World Class Recruitment Software",
 };
 

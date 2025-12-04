@@ -1,8 +1,8 @@
-# AppiTrak
+# CarGuys Inc Client Dashboard
 
-AppiTrak is a tailormade CRM and ATS for recruiters. 
+The CGI Client Dashboard is for clients of CarGuys Inc. 
 
-## AppiTrak Core Features
+## Core Features
 
 - **Team accounts**: Team accounts are billable accounts that can be shared by multiple users. Team accounts can be
   disabled if you only wish to allow personal accounts. 
