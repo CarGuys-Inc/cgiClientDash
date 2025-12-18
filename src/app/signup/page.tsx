@@ -3,26 +3,40 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import StripeForm from "./StripeForm";
-
-const plans = [
-  { id: "basic", name: "Basic", price: 49 },
-  { id: "pro", name: "Pro", price: 99 },
-  { id: "elite", name: "Elite", price: 149 }
-];
+import { stripe } from "@/lib/stripe/server";
 
 export default async function SignupPage({
   searchParams
 }: {
   searchParams: Record<string, string | undefined>;
 }) {
-  const step = searchParams.step ?? "info";
+  const prices = await stripe.prices.list({
+    active: true,
+    expand: ["data.product"],
+  });
 
-  const email = searchParams.email ?? "";
-  const company = searchParams.company ?? "";
-  const job = searchParams.job ?? "";
-  const selectedPlan = searchParams.plan ?? "";
+  const plans = prices.data.map((price) => ({
+    priceId: price.id,
+    name: (price.product as any).name,
+    amount: price.unit_amount!,
+    interval: price.recurring?.interval,
+  }));
 
-  const currentPlan = plans.find((p) => p.id === selectedPlan);
+  const params = await searchParams;
+
+  const step = params.step ?? "info";
+  const email = params.email ?? "";
+  const company = params.company ?? "";
+  const job = params.job ?? "";
+  const selectedPriceId = params.priceId ?? "";
+  const intentId = params.intent ?? "";
+
+
+  const currentPlan = plans.find(
+    (p) => p.priceId === selectedPriceId
+  );
+
+
 
   return (
     <div className="max-w-6xl mx-auto py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -69,30 +83,31 @@ export default async function SignupPage({
         </form>
       </div>
 
-      {/* MIDDLE — STEP 2 */}
-      <div className="space-y-6 opacity-100">
-        <h2 className="text-xl font-semibold">2. Choose Your Plan</h2>
+{/* MIDDLE — STEP 2 */}
+<div className="space-y-6">
+  <h2 className="text-xl font-semibold">2. Choose Your Plan</h2>
 
-        <form action={selectPlan} className="space-y-3">
-          <input type="hidden" name="email" value={email} />
-          <input type="hidden" name="company" value={company} />
-          <input type="hidden" name="job" value={job} />
+  <form action={selectPlan} className="space-y-3">
+    <input type="hidden" name="email" value={email} />
+    <input type="hidden" name="company" value={company} />
+    <input type="hidden" name="job" value={job} />
 
-          {plans.map((plan) => (
-            <button
-              key={plan.id}
-              name="plan"
-              value={plan.id}
-              className={`w-full border p-4 rounded text-left ${
-                selectedPlan === plan.id ? "border-black bg-gray-50" : "border-gray-300"
-              }`}
-            >
-              <div className="font-semibold">{plan.name}</div>
-              <div className="text-sm text-gray-600">${plan.price}/month</div>
-            </button>
-          ))}
-        </form>
-      </div>
+    {plans.map((plan) => (
+      <button
+        key={plan.priceId}
+        name="priceId"
+        value={plan.priceId}
+        className={`w-full border p-4 rounded text-left ${selectedPriceId === plan.priceId ? "border-black bg-gray-50" : "border-gray-300"}`}
+      >
+        <div className="font-semibold">{plan.name}</div>
+        <div className="text-sm text-gray-600">
+          ${(plan.amount / 100).toFixed(2)} / {plan.interval}
+        </div>
+      </button>
+    ))}
+  </form>
+</div>
+
 
       {/* RIGHT — STEP 3 */}
       <div className="space-y-6">
@@ -103,7 +118,7 @@ export default async function SignupPage({
           <div>
             {currentPlan ? (
               <>
-                {currentPlan.name} – <b>${currentPlan.price}/mo</b>
+                {currentPlan.name} – <b>${currentPlan.amount}/mo</b>
               </>
             ) : (
               <span className="text-gray-500">No plan selected</span>
@@ -115,18 +130,17 @@ export default async function SignupPage({
 
           <div className="pt-4 font-medium">Total:</div>
           <div className="text-2xl font-semibold">
-            ${currentPlan?.price ?? 0}/mo
+            ${currentPlan?.amount ?? 0}/mo
           </div>
         </div>
 
-        {currentPlan && email && company && job && (
-          <StripeForm
-            email={email}
-            company={company}
-            job={job}
-            plan={selectedPlan}
-          />
-        )}
+{currentPlan && email && company && job && (
+  <StripeForm
+    priceId={currentPlan.priceId}
+    email={email}
+  />
+)}
+
       </div>
     </div>
   );
@@ -138,39 +152,58 @@ async function submitUserInfo(formData: FormData) {
   "use server";
 
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
   const company = formData.get("company") as string;
   const job = formData.get("job") as string;
 
   const supabase = await createClient();
 
-  // Create auth user
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase
+    .from("signup_intents")
+    .insert({
+      email,
+      company_name: company,
+      job_titles: [job],
+      status: "pending",
+    })
+    .select("id")
+    .single();
+
   if (error) throw new Error(error.message);
 
-  const authUserId = data.user?.id;
-  if (!authUserId) throw new Error("User creation failed.");
-
-  // Store their company + job
-  await supabase.from("client_profiles").insert({
-    auth_user_id: authUserId,
-    email,
-    company_name: company,
-    primary_job_title: job
-  });
-
-  redirect(`/signup?step=plan&email=${email}&company=${company}&job=${job}`);
+  redirect(`/signup?intent=${data.id}&step=plan`);
 }
+
 
 async function selectPlan(formData: FormData) {
   "use server";
 
-  const email = formData.get("email") as string;
-  const company = formData.get("company") as string;
-  const job = formData.get("job") as string;
-  const plan = formData.get("plan") as string;
+  const intentId = formData.get("intent") as string;
+  const priceId = formData.get("priceId") as string;
 
-  redirect(
-    `/signup?step=summary&email=${email}&company=${company}&job=${job}&plan=${plan}`
-  );
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("signup_intents")
+    .update({ stripe_price_id: priceId })
+    .eq("id", intentId);
+
+  if (error) throw new Error(error.message);
+
+  redirect(`/signup?intent=${intentId}&step=summary`);
+}
+
+async function addJobTitle(formData: FormData) {
+  "use server";
+
+  const intentId = formData.get("intent") as string;
+  const jobTitle = formData.get("job") as string;
+
+  const supabase = await createClient();
+
+  await supabase.rpc("append_job_title", {
+    intent_id: intentId,
+    job_title: jobTitle,
+  });
+
+  redirect(`/signup?intent=${intentId}`);
 }

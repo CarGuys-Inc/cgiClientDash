@@ -16,7 +16,7 @@ export default function Home() {
         </nav>
         <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
           <main className="flex-1 flex flex-col items-center justify-center text-center px-5">
-            <h2 className="font-medium text-xl mb-4"><a className="bold underline hover:font-extrabold" href="/login">Login</a> to get started.</h2>
+            <h2 className="font-medium text-xl mb-4"><a className="bold underline hover:font-extrabold" href="/signup">Sign Up</a> to get started.</h2>
           </main>
         </div>
 
