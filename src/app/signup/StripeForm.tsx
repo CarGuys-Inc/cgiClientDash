@@ -23,6 +23,7 @@ export default function StripeForm({
 }
 
 function CheckoutForm({ priceId, email }: { priceId: string; email: string }) {
+  console.log("Stripe Form Initialized");
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
