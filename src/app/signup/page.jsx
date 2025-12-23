@@ -20,6 +20,9 @@ export default async function SignupPage({ searchParams }) {
   const state = params.state ?? "";
   const zip = params.zip ?? "";
   const selectedPriceId = params.priceId ?? "";
+  const incomeLow = params.incomeLow ?? "";
+  const incomeHigh = params.incomeHigh ?? "";
+  const incomeRate = params.incomeRate ?? "";
 
   const intentId =
     params.intent && params.intent !== "null" ? params.intent : "";
@@ -41,6 +44,17 @@ export default async function SignupPage({ searchParams }) {
     (p) => p.priceId === selectedPriceId
   );
 
+  const supabase = await createClient();
+
+const { data: jobTitles, error: jobTitlesError } = await supabase
+  .from("job_titles")
+  .select("title")
+  .order("title");
+
+if (jobTitlesError) {
+  throw new Error(jobTitlesError.message);
+}
+
   return (
     <div className="max-w-6xl mx-auto py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
 
@@ -49,15 +63,18 @@ export default async function SignupPage({ searchParams }) {
         <h2 className="text-xl font-semibold">1. Your Info</h2>
 
         <form action={submitUserInfo} className="space-y-4">
+          <span className="text-sm text-gray-500">
+            Please provide your company and contact details.
+          </span>
           <input type="hidden" name="intent" value={intentId} />
 
-          <input className="border p-3 w-full rounded" name="email" type="email" placeholder="Work email" defaultValue={email} required />
-          <input className="border p-3 w-full rounded" name="password" type="password" placeholder="Password" required />
-          <input className="border p-3 w-full rounded" name="company" placeholder="Company name" defaultValue={company} required />
-          <input className="border p-3 w-full rounded" name="job" placeholder="Primary job title" defaultValue={job} required />
-          <input className="border p-3 w-full rounded" name="phone" placeholder="Phone number" defaultValue={phone} required />
+          <input className="border p-3 w-full rounded" name="email" type="email" placeholder="Your company email" defaultValue={email} required />
+          <input className="border p-3 w-full rounded" name="password" type="password" placeholder="Create a password" required />
+          <input className="border p-3 w-full rounded" name="company" placeholder="Company name - You are recruiting for" defaultValue={company} required />
 
-          <input className="border p-3 w-full rounded" name="address1" placeholder="Street address" defaultValue={address1} required />
+          <input className="border p-3 w-full rounded" name="phone" placeholder="Your company phone number" defaultValue={phone} required />
+
+          <input className="border p-3 w-full rounded" name="address1" placeholder="Company street address" defaultValue={address1} required />
           <input className="border p-3 w-full rounded" name="address2" placeholder="Address line 2" defaultValue={address2} />
 
           <div className="grid grid-cols-2 gap-2">
@@ -67,6 +84,60 @@ export default async function SignupPage({ searchParams }) {
 
           <input className="border p-3 w-full rounded" name="zip" placeholder="ZIP code" defaultValue={zip} required />
 
+          <p className="text-sm text-gray-500 pt-4">Please provide info about the job you are recruiting for.</p>
+          <select
+  name="job"
+  required
+  defaultValue={job}
+  className="border p-3 w-full rounded bg-white"
+>
+  <option value="" disabled>
+    Select job title you are recruiting for
+  </option>
+
+  {jobTitles.map((jt) => (
+    <option key={jt.title} value={jt.title}>
+      {jt.title}
+    </option>
+  ))}
+</select>
+
+<div className="grid grid-cols-2 gap-2">
+  <input
+    className="border p-3 rounded"
+    name="incomeLow"
+    type="number"
+    placeholder="Minimum Income ($)"
+    defaultValue={incomeLow}
+    required
+  />
+  <input
+    className="border p-3 rounded"
+    name="incomeHigh"
+    type="number"
+    placeholder="Maximum Income ($)"
+    defaultValue={incomeHigh}
+    required
+  />
+</div>
+<select
+  name="incomeRate"
+  required
+  defaultValue={incomeRate}
+  className="border p-3 w-full rounded bg-white"
+>
+  <option value="" disabled>
+    Income Rate
+  </option>
+
+      <option key="hourly" value="hourly">
+      Hourly
+    </option>
+      <option key="salary" value="salary">
+      Salary
+    </option>
+
+</select>
           <button className="bg-black text-white p-3 rounded w-full">
             Save & Continue
           </button>
@@ -84,6 +155,9 @@ export default async function SignupPage({ searchParams }) {
               email,
               company,
               job,
+                incomeLow,
+  incomeHigh,
+              incomeRate,
               phone,
               address1,
               address2,
@@ -166,6 +240,9 @@ async function submitUserInfo(formData) {
       company_name: data.company,
       primary_job_title: data.job,
       phone: data.phone,
+      income_low: Number(data.incomeLow),
+      income_high: Number(data.incomeHigh),
+      income_rate: data.incomeRate,
       address_1: data.address1,
       address_2: data.address2,
       city: data.city,
@@ -183,6 +260,9 @@ async function submitUserInfo(formData) {
     email: data.email,
     company: data.company,
     job: data.job,
+    incomeLow: data.incomeLow,
+    incomeHigh: data.incomeHigh,
+    incomeRate: data.incomeRate,
     phone: data.phone,
     address1: data.address1,
     address2: data.address2,
@@ -219,6 +299,9 @@ async function selectPlan(formData) {
     email: formData.get("email"),
     company: formData.get("company"),
     job: formData.get("job"),
+    incomeLow: formData.get("incomeLow"),
+    incomeHigh: formData.get("incomeHigh"),
+    incomeRate: formData.get("incomeRate"),
     phone: formData.get("phone"),
     address1: formData.get("address1"),
     address2: formData.get("address2"),
