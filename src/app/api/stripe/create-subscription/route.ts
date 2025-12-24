@@ -42,13 +42,16 @@ export async function POST(req: Request) {
       `;
     }
 
-    // 3. Create Subscription (Force Charge Automatically)
+    // 3. Create Subscription (WITH FORCED CARD TYPE)
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
       payment_behavior: "default_incomplete",
-      payment_settings: { save_default_payment_method: "on_subscription" },
-      collection_method: "charge_automatically", // <--- THIS IS THE KEY FIX
+      payment_settings: { 
+        save_default_payment_method: "on_subscription",
+        payment_method_types: ["card"], // <--- THE FIX
+      },
+      collection_method: "charge_automatically",
       expand: ["latest_invoice.payment_intent"],
     });
 
