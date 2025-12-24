@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import sql from "@/lib/db";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// 1. PIN THE API VERSION to ensure stable behavior
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-12-18.acacia' as any, // Use latest or your preferred version
+});
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing priceId or email" }, { status: 400 });
     }
 
-    // 1. Find user in DB
+    // 2. Find user in DB
     const rows = await sql`
       SELECT id, stripe_customer_id 
       FROM signup_intents 
@@ -27,7 +30,7 @@ export async function POST(req: Request) {
 
     let customerId = user.stripe_customer_id;
 
-    // 2. Create Stripe Customer if missing
+    // 3. Create Stripe Customer if missing
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: email,
@@ -42,20 +45,19 @@ export async function POST(req: Request) {
       `;
     }
 
-    // 3. Create Subscription (WITH FORCED CARD TYPE)
+    // 4. Create Subscription (Use Automatic Payment Methods)
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
       payment_behavior: "default_incomplete",
       payment_settings: { 
         save_default_payment_method: "on_subscription",
-        payment_method_types: ["card"], // <--- THE FIX
+        // REMOVED "payment_method_types" to prevent conflicts with Dashboard
       },
-      collection_method: "charge_automatically",
       expand: ["latest_invoice.payment_intent"],
     });
 
-    // 4. Retrieve the Invoice
+    // 5. Retrieve the Invoice
     let invoice = subscription.latest_invoice as Stripe.Invoice | string | null;
 
     if (typeof invoice === 'string') {
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
     
     const fullInvoice = invoice as Stripe.Invoice;
 
-    // 5. Handle "Free", "Trial", or "Already Paid" Plans ($0 due)
+    // 6. Handle "Free/Trial/Paid" Plans
     if (fullInvoice.amount_due === 0 || fullInvoice.status === 'paid') {
         return NextResponse.json({
             subscriptionId: subscription.id,
@@ -77,46 +79,46 @@ export async function POST(req: Request) {
         });
     }
 
-    // 6. Handle "Paid" Plans - Get Payment Intent
-    let rawPaymentIntent: any = (fullInvoice as any).payment_intent;
+    // 7. Get Client Secret (With Robust Fallback)
+    let clientSecret = null;
+    
+    // Attempt A: Get secret from expanded Payment Intent
+    const pi = (fullInvoice as any).payment_intent;
+    if (pi && pi.client_secret) {
+        clientSecret = pi.client_secret;
+    }
 
-    // --- RECOVERY BLOCK ---
-    if (!rawPaymentIntent) {
-        // Refetch to be sure
+    // Attempt B: Recovery - If PI is missing, re-fetch specifically for it
+    if (!clientSecret) {
+        console.log("Payment Intent missing. Attempting refetch...");
         const refreshedInvoice = await stripe.invoices.retrieve(fullInvoice.id, {
             expand: ['payment_intent']
         });
-        rawPaymentIntent = (refreshedInvoice as any).payment_intent;
-        
-        // If still missing and invoice is draft, finalize it
-        if (!rawPaymentIntent && refreshedInvoice.status === 'draft') {
-             const finalizedInvoice = await stripe.invoices.finalizeInvoice(fullInvoice.id, {
-                 expand: ['payment_intent']
-             });
-             rawPaymentIntent = (finalizedInvoice as any).payment_intent;
+        const refreshedPi = (refreshedInvoice as any).payment_intent;
+        if (refreshedPi && refreshedPi.client_secret) {
+             clientSecret = refreshedPi.client_secret;
         }
     }
 
-    let resolvedPaymentIntent: Stripe.PaymentIntent;
-
-    if (typeof rawPaymentIntent === 'string') {
-      resolvedPaymentIntent = await stripe.paymentIntents.retrieve(rawPaymentIntent);
-    } else if (rawPaymentIntent && typeof rawPaymentIntent === 'object') {
-      resolvedPaymentIntent = rawPaymentIntent as Stripe.PaymentIntent;
-    } else {
-      // DEBUG: If this throws, check your Stripe Dashboard -> Invoices
-      console.error("Critical Stripe Error. Invoice JSON:", JSON.stringify(fullInvoice, null, 2));
-      throw new Error(`Invoice ${fullInvoice.id} (${fullInvoice.status}) has amount ${fullInvoice.amount_due} but no Payment Intent.`);
+    // Attempt C: Final Fail-Safe - Check for "setup_intent" or "confirmation_secret" (Newer API feature)
+    if (!clientSecret) {
+         // Some configurations put the secret directly on the invoice
+         // @ts-ignore
+         if (fullInvoice.confirmation_secret) {
+             // @ts-ignore
+             clientSecret = fullInvoice.confirmation_secret;
+         }
     }
 
-    // 7. Final Validation
-    if (!resolvedPaymentIntent.client_secret) {
-      throw new Error("Stripe Error: Missing Client Secret.");
+    if (!clientSecret) {
+      // DEBUG LOG: This will show up in DigitalOcean logs if it fails
+      console.error("CRITICAL DEBUG: Invoice JSON:", JSON.stringify(fullInvoice, null, 2));
+      throw new Error(`Stripe Error: Invoice ${fullInvoice.id} is Open but has no Client Secret. Check 'Default' Payment Settings in Stripe Dashboard.`);
     }
 
     return NextResponse.json({
       subscriptionId: subscription.id,
-      clientSecret: resolvedPaymentIntent.client_secret,
+      clientSecret: clientSecret,
     });
 
   } catch (error: any) {
