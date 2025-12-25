@@ -24,8 +24,14 @@ export async function POST(req: Request) {
 
     console.log("🚀 Forwarding data to Recruiterflow for:", email);
 
-    // 2. Pass them to the external Webhook
-    const webhookRes = await fetch("http://localhost:8000/webhook/recruiterflow", {
+    // 2. Determine the correct Backend URL dynamically
+    // Use the live domain in production, or localhost for local testing.
+    const API_BASE = process.env.NODE_ENV === "production"
+      ? "https://dashboard.carguysinc.com" 
+      : "http://localhost:8000";
+
+    // 3. Pass them to the external Webhook
+    const webhookRes = await fetch(`${API_BASE}/webhook/recruiterflow`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -51,10 +57,17 @@ export async function POST(req: Request) {
     });
 
     if (!webhookRes.ok) {
-      const errorData = await webhookRes.json();
+      // Try to parse error JSON, but handle cases where response isn't JSON
+      let errorData;
+      try {
+        errorData = await webhookRes.json();
+      } catch (e) {
+        errorData = await webhookRes.text();
+      }
+
       console.error("❌ Recruiterflow rejected the data:", errorData);
       return NextResponse.json(
-        { error: `Recruiterflow Error: ${webhookRes.status}` }, 
+        { error: `Backend Error: ${webhookRes.status}` }, 
         { status: 502 }
       );
     }
