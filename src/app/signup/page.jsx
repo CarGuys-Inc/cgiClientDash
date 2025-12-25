@@ -219,6 +219,17 @@ export default async function SignupPage({ searchParams }) {
             <StripeForm
               priceId={currentPlan.priceId}
               email={email}
+              companyName={company}
+              companyPhone={phone}
+              companyAddress={`${address1} ${address2}`.trim()} // Combine address lines
+              companyCity={city}
+              companyState={state}
+              companyZip={zip}
+              jobName={job}
+              incomeMin={incomeLow}
+              incomeMax={incomeHigh}
+              incomeRate={incomeRate}
+              subscriptionName={currentPlan.name}
             />
           )}
         </ClientOnly>
