@@ -4,8 +4,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     
-    // 1. Destructure all the new fields from the incoming request
+    // 1. Destructure all fields (Added firstName, lastName, jobDescription)
     const { 
+      firstName,        // <--- NEW
+      lastName,         // <--- NEW
+      jobDescription,   // <--- NEW
       email, 
       companyName, 
       jobName, 
@@ -25,7 +28,6 @@ export async function POST(req: Request) {
     console.log("🚀 Forwarding data to Recruiterflow for:", email);
 
     // 2. Determine the correct Backend URL dynamically
-    // Use the live domain in production, or localhost for local testing.
     const API_BASE = process.env.NODE_ENV === "production"
       ? "https://dashboard.carguysinc.com" 
       : "http://localhost:8000";
@@ -39,14 +41,17 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         source: "nextjs_checkout",
-        email,             // company email
+        firstName,         // <--- SENDING TO LARAVEL
+        lastName,          // <--- SENDING TO LARAVEL
+        jobDescription,    // <--- SENDING TO LARAVEL
+        email,             
         companyName,
         companyPhone,
         companyAddress,
         companyCity,
         companyState,
         companyZip,
-        jobName,          // job title
+        jobName,          
         incomeMin,
         incomeMax,
         incomeRate,
@@ -57,7 +62,6 @@ export async function POST(req: Request) {
     });
 
     if (!webhookRes.ok) {
-      // Try to parse error JSON, but handle cases where response isn't JSON
       let errorData;
       try {
         errorData = await webhookRes.json();

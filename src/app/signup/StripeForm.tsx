@@ -2,24 +2,34 @@
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js"; // 1. Import Supabase
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-// 1. Updated Interface to include all required Recruiterflow fields
+// 2. Initialize Supabase Client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 interface StripeFormProps {
   priceId: string;
-  email: string; // company email
+  // --- NEW FIELDS ---
+  firstName: string;
+  lastName: string;
+  // ------------------
+  email: string;
   companyName: string;
   companyPhone: string;
   companyAddress: string;
   companyCity: string;
   companyState: string;
   companyZip: string;
-  jobName: string; // job title
+  jobName: string; 
   incomeMin: string | number;
   incomeMax: string | number;
-  incomeRate: string; // e.g., "Hourly", "Yearly"
+  incomeRate: string;
   subscriptionName: string;
 }
 
@@ -36,6 +46,35 @@ function CheckoutForm(props: StripeFormProps) {
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 3. State to hold the fetched description
+  const [fetchedDescription, setFetchedDescription] = useState("");
+
+  // 4. Fetch the description when the component loads
+  useEffect(() => {
+    async function getJobDescription() {
+      if (!props.jobName) return;
+
+      try {
+        // Make sure this table name matches your Supabase table EXACTLY
+        const { data, error } = await supabase
+          .from("job_description") 
+          .select("description")
+          .eq("title", props.jobName)
+          .single();
+
+        if (error) {
+          console.error("Supabase error fetching description:", error);
+        } else if (data) {
+          setFetchedDescription(data.description || "");
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      }
+    }
+
+    getJobDescription();
+  }, [props.jobName]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,21 +101,23 @@ function CheckoutForm(props: StripeFormProps) {
       if (stripeError) throw new Error(stripeError.message);
 
       if (paymentIntent?.status === "succeeded") {
-        // --- Delay to let Stripe finish background processing ---
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
-        // 2. Send all data to your internal API
+        // 5. Send all data to your internal API
         const saveRes = await fetch("/api/save-signup-data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // Existing fields
+            // --- NEW FIELDS ---
+            firstName: props.firstName,
+            lastName: props.lastName,
+            jobDescription: fetchedDescription, 
+            // ------------------
+            
             email: props.email,
             companyName: props.companyName,
             jobName: props.jobName,
             stripePaymentId: paymentIntent.id,
-            
-            // New fields passed from props
             companyPhone: props.companyPhone,
             companyAddress: props.companyAddress,
             companyCity: props.companyCity,
@@ -86,9 +127,6 @@ function CheckoutForm(props: StripeFormProps) {
             incomeMax: props.incomeMax,
             incomeRate: props.incomeRate,
             subscriptionName: props.subscriptionName,
-
-            // Amount paid comes directly from the successful Stripe PaymentIntent (in cents)
-            // We divide by 100 to get the dollar amount
             amountPaid: paymentIntent.amount / 100 
           }),
         });
