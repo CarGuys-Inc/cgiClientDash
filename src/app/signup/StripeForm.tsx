@@ -2,12 +2,11 @@
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js"; // 1. Import Supabase
+import { useState, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-// 2. Initialize Supabase Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -15,10 +14,8 @@ const supabase = createClient(
 
 interface StripeFormProps {
   priceId: string;
-  // --- NEW FIELDS ---
   firstName: string;
   lastName: string;
-  // ------------------
   email: string;
   companyName: string;
   companyPhone: string;
@@ -31,6 +28,13 @@ interface StripeFormProps {
   incomeMax: string | number;
   incomeRate: string;
   subscriptionName: string;
+  
+  // --- UPSELL FIELDS ---
+  hasUpsell?: boolean; 
+  upsellJobName?: string;
+  upsellIncomeMin?: string | number;
+  upsellIncomeMax?: string | number;
+  upsellIncomeRate?: string;
 }
 
 export default function StripeForm(props: StripeFormProps) {
@@ -44,19 +48,54 @@ export default function StripeForm(props: StripeFormProps) {
 function CheckoutForm(props: StripeFormProps) {
   const stripe = useStripe();
   const elements = useElements();
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // 3. State to hold the fetched description
   const [fetchedDescription, setFetchedDescription] = useState("");
+  
+  // 1. Store the secret locally so we don't have to fetch it on click
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  // 4. Fetch the description when the component loads
+  // 2. Pre-Fetch the Payment Intent (Background)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function createPaymentIntent() {
+      // Clear old secret if params changed to prevent paying for wrong plan
+      setClientSecret(null);
+      
+      if (!props.priceId || !props.email) return;
+
+      try {
+        const res = await fetch("/api/stripe/create-subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+              priceId: props.priceId, 
+              email: props.email,
+              hasUpsell: props.hasUpsell 
+          }),
+        });
+        
+        const data = await res.json();
+        if (isMounted && data.clientSecret) {
+            setClientSecret(data.clientSecret);
+        }
+      } catch (err) {
+        console.error("Background intent creation failed", err);
+      }
+    }
+
+    createPaymentIntent();
+
+    return () => { isMounted = false; };
+  }, [props.priceId, props.email, props.hasUpsell]); // Re-run if upsell is toggled
+
+  // 3. Fetch description for MAIN job (Visual only)
   useEffect(() => {
     async function getJobDescription() {
       if (!props.jobName) return;
-
       try {
-        // Make sure this table name matches your Supabase table EXACTLY
         const { data, error } = await supabase
           .from("job_description") 
           .select("description")
@@ -72,7 +111,6 @@ function CheckoutForm(props: StripeFormProps) {
         console.error("Unexpected error:", err);
       }
     }
-
     getJobDescription();
   }, [props.jobName]);
 
@@ -84,36 +122,47 @@ function CheckoutForm(props: StripeFormProps) {
     setError(null);
 
     try {
-      // Create Subscription
-      const res = await fetch("/api/stripe/create-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId: props.priceId, email: props.email }),
-      });
-      const { clientSecret } = await res.json();
+      // 4. Use Pre-Fetched Secret (Or fetch fallback)
+      let secret = clientSecret;
 
-      // Confirm Payment
+      if (!secret) {
+         // Fallback: If user clicked FAST, fetch it now
+         const res = await fetch("/api/stripe/create-subscription", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                priceId: props.priceId, 
+                email: props.email,
+                hasUpsell: props.hasUpsell 
+            }),
+         });
+         const data = await res.json();
+         if (data.error) throw new Error(data.error);
+         secret = data.clientSecret;
+      }
+
+      if (!secret) throw new Error("Payment initialization failed.");
+
+      // 5. Confirm Payment
       const card = elements.getElement(CardElement)!;
-      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(secret, {
         payment_method: { card }
       });
 
       if (stripeError) throw new Error(stripeError.message);
 
       if (paymentIntent?.status === "succeeded") {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        
+        // --- REMOVED 3-SECOND DELAY HERE FOR SPEED ---
 
-        // 5. Send all data to your internal API
+        // 6. Save Data
         const saveRes = await fetch("/api/save-signup-data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // --- NEW FIELDS ---
             firstName: props.firstName,
             lastName: props.lastName,
             jobDescription: fetchedDescription, 
-            // ------------------
-            
             email: props.email,
             companyName: props.companyName,
             jobName: props.jobName,
@@ -127,7 +176,14 @@ function CheckoutForm(props: StripeFormProps) {
             incomeMax: props.incomeMax,
             incomeRate: props.incomeRate,
             subscriptionName: props.subscriptionName,
-            amountPaid: paymentIntent.amount / 100 
+            amountPaid: paymentIntent.amount / 100,
+            
+            // Upsell Payload
+            hasUpsell: props.hasUpsell,
+            upsellJobName: props.upsellJobName,
+            upsellIncomeMin: props.upsellIncomeMin,
+            upsellIncomeMax: props.upsellIncomeMax,
+            upsellIncomeRate: props.upsellIncomeRate
           }),
         });
 
@@ -142,6 +198,10 @@ function CheckoutForm(props: StripeFormProps) {
     }
   }
 
+  const buttonText = loading 
+    ? "Processing..." 
+    : (props.hasUpsell ? "Pay Now (Includes Bonus Job)" : "Pay Now & Complete");
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-3 border rounded bg-white">
@@ -150,10 +210,12 @@ function CheckoutForm(props: StripeFormProps) {
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm border border-red-200">{error}</div>}
       <button
         type="submit"
-        disabled={loading || !stripe}
-        className="bg-black text-white p-3 rounded w-full disabled:opacity-50"
+        // Disable if loading, or if stripe hasn't loaded yet.
+        // We do NOT disable if clientSecret is missing, because handleSubmit has a fallback fetch.
+        disabled={loading || !stripe} 
+        className={`bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all`}
       >
-        {loading ? "Processing..." : "Pay & Complete Signup"}
+        {buttonText}
       </button>
     </form>
   );

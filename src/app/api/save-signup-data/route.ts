@@ -4,11 +4,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     
-    // 1. Destructure all fields (Added firstName, lastName, jobDescription)
+    // 1. Destructure all fields (Added Upsell fields)
     const { 
-      firstName,        // <--- NEW
-      lastName,         // <--- NEW
-      jobDescription,   // <--- NEW
+      firstName,        
+      lastName,         
+      jobDescription,   
       email, 
       companyName, 
       jobName, 
@@ -22,7 +22,14 @@ export async function POST(req: Request) {
       incomeMax,
       incomeRate,
       amountPaid,
-      subscriptionName
+      subscriptionName,
+      // --- NEW UPSELL DATA ---
+      hasUpsell,
+      upsellJobName,
+      // (Optional) If you want specific salary info for the 2nd job, capture it here:
+      upsellIncomeMin,
+      upsellIncomeMax,
+      upsellIncomeRate
     } = body;
 
     console.log("🚀 Forwarding data to Recruiterflow for:", email);
@@ -41,9 +48,9 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         source: "nextjs_checkout",
-        firstName,         // <--- SENDING TO LARAVEL
-        lastName,          // <--- SENDING TO LARAVEL
-        jobDescription,    // <--- SENDING TO LARAVEL
+        firstName,        
+        lastName,         
+        jobDescription,   
         email,             
         companyName,
         companyPhone,
@@ -58,6 +65,14 @@ export async function POST(req: Request) {
         amountPaid,
         subscriptionName,
         stripePaymentId,
+        
+        // --- FORWARD UPSELL DATA ---
+        // Your Laravel backend can now check: if (hasUpsell) { createJob2(); }
+        hasUpsell,
+        upsellJobName,
+        upsellIncomeMin, // Pass these if available so Job 2 has the right salary
+        upsellIncomeMax,
+        upsellIncomeRate
       }),
     });
 

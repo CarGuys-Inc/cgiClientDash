@@ -2,14 +2,18 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import sql from "@/lib/db";
 
-// 1. PIN THE API VERSION to ensure stable behavior
+// 1. PIN THE API VERSION
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia' as any, // Use latest or your preferred version
+  apiVersion: '2024-12-18.acacia' as any,
 });
+
+// --- CONFIGURATION ---
+// Replace this with your actual Stripe Price ID for the $599 product
+const UPSELL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_UPSELL_PRICE_ID!;
 
 export async function POST(req: Request) {
   try {
-    const { priceId, email } = await req.json();
+    const { priceId, email, hasUpsell } = await req.json();
 
     if (!priceId || !email) {
       return NextResponse.json({ error: "Missing priceId or email" }, { status: 400 });
@@ -45,19 +49,34 @@ export async function POST(req: Request) {
       `;
     }
 
-    // 4. Create Subscription (Use Automatic Payment Methods)
+    // 4. Build Subscription Items Array
+    const subscriptionItems = [
+        { price: priceId, quantity: 1 } // Main Plan
+    ];
+
+    // IF Upsell is checked, add the second item
+    if (hasUpsell) {
+        subscriptionItems.push({
+            price: UPSELL_PRICE_ID,
+            quantity: 1
+        });
+    }
+
+    // 5. Create Subscription
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
-      items: [{ price: priceId }],
+      items: subscriptionItems, // <--- Use the dynamic array
       payment_behavior: "default_incomplete",
       payment_settings: { 
         save_default_payment_method: "on_subscription",
-        // REMOVED "payment_method_types" to prevent conflicts with Dashboard
       },
       expand: ["latest_invoice.payment_intent"],
+      metadata: {
+        hasUpsell: hasUpsell ? "true" : "false"
+      }
     });
 
-    // 5. Retrieve the Invoice
+    // 6. Retrieve the Invoice
     let invoice = subscription.latest_invoice as Stripe.Invoice | string | null;
 
     if (typeof invoice === 'string') {
@@ -70,27 +89,17 @@ export async function POST(req: Request) {
     
     const fullInvoice = invoice as Stripe.Invoice;
 
-    // 6. Handle "Free/Trial/Paid" Plans
-    if (fullInvoice.amount_due === 0 || fullInvoice.status === 'paid') {
-        return NextResponse.json({
-            subscriptionId: subscription.id,
-            clientSecret: null, 
-            message: "Subscription active (No payment needed)" 
-        });
-    }
-
-    // 7. Get Client Secret (With Robust Fallback)
+    // 7. Get Client Secret
     let clientSecret = null;
     
-    // Attempt A: Get secret from expanded Payment Intent
+    // Attempt A
     const pi = (fullInvoice as any).payment_intent;
     if (pi && pi.client_secret) {
         clientSecret = pi.client_secret;
     }
 
-    // Attempt B: Recovery - If PI is missing, re-fetch specifically for it
+    // Attempt B (Recovery)
     if (!clientSecret) {
-        console.log("Payment Intent missing. Attempting refetch...");
         const refreshedInvoice = await stripe.invoices.retrieve(fullInvoice.id, {
             expand: ['payment_intent']
         });
@@ -100,20 +109,9 @@ export async function POST(req: Request) {
         }
     }
 
-    // Attempt C: Final Fail-Safe - Check for "setup_intent" or "confirmation_secret" (Newer API feature)
     if (!clientSecret) {
-         // Some configurations put the secret directly on the invoice
-         // @ts-ignore
-         if (fullInvoice.confirmation_secret) {
-             // @ts-ignore
-             clientSecret = fullInvoice.confirmation_secret;
-         }
-    }
-
-    if (!clientSecret) {
-      // DEBUG LOG: This will show up in DigitalOcean logs if it fails
       console.error("CRITICAL DEBUG: Invoice JSON:", JSON.stringify(fullInvoice, null, 2));
-      throw new Error(`Stripe Error: Invoice ${fullInvoice.id} is Open but has no Client Secret. Check 'Default' Payment Settings in Stripe Dashboard.`);
+      throw new Error(`Stripe Error: Invoice ${fullInvoice.id} has no Client Secret.`);
     }
 
     return NextResponse.json({
