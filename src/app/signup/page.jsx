@@ -7,6 +7,8 @@ import Image from "next/image";
 import StripeForm from "./StripeForm";
 import { stripe } from "@/lib/stripe/server";
 import ClientOnly from "@/components/ClientOnly";
+// --- IMPORT THE TOAST COMPONENT ---
+import RealTimeToast from "@/components/RealTimeToast"; 
 
 /* --- HELPER COMPONENT: ORDER BUMP (SIDEBAR) --- */
 const OrderBump = ({ isChecked, allParams }) => (
@@ -20,7 +22,6 @@ const OrderBump = ({ isChecked, allParams }) => (
       }
       redirect(`/signup?${params.toString()}`);
   }}>
-    {/* CHANGED: Added yellow bg/border to make it pop like a special offer */}
     <label className={`relative block border-2 rounded-xl p-3 cursor-pointer transition-all group ${isChecked ? 'border-black bg-yellow-50' : 'border-yellow-200 bg-yellow-50/50 hover:border-yellow-400'}`}>
         <div className="flex items-start gap-3">
             <div className="pt-1">
@@ -35,7 +36,6 @@ const OrderBump = ({ isChecked, allParams }) => (
             <div className="flex-1">
                 <div className="flex justify-between items-center w-full">
                     <span className="font-bold text-sm">Add a 2nd Job To Your Account</span>
-                    {/* CHANGED: Badge color to Green for "Deal" psychology */}
                     <span className="bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">SAVE 40%</span>
                 </div>
                 <p className="text-xs text-gray-600 mt-1 leading-snug">
@@ -56,7 +56,6 @@ export default async function SignupPage({ searchParams }) {
   const LOGO_URL = "https://static.wixstatic.com/media/ab8453_a440e78742794377aa1d88a94c1e589b~mv2.webp/v1/fill/w_350,h_94,al_c,lg_1,q_80,enc_avif,quality_auto/Untitled%20design%20(25)%20(1).webp";
   // =========================================================================
 
-  // --- CRITICAL FIX: SANITIZE PARAMS ---
   const getSafeParam = (val) => {
     if (Array.isArray(val)) return val[0]; 
     return val && val !== "null" ? val : "";
@@ -70,6 +69,8 @@ export default async function SignupPage({ searchParams }) {
   // Personal
   const firstName = getSafeParam(params.firstName);
   const lastName = getSafeParam(params.lastName);
+  // 🟢 NEW PARAM: User's Title
+  const userTitle = getSafeParam(params.userTitle);
 
   // Account
   const email = getSafeParam(params.email);
@@ -100,24 +101,18 @@ export default async function SignupPage({ searchParams }) {
   const selectedPriceId = getSafeParam(params.priceId);
 
   // ---- Logic: Determine Active & Completed Steps ----
-  
-  // Step 1: Job 1 & Location
   const isStep1Complete = !!job && !!incomeLow && !!email && !!zip;
   const isStep1Active = !isStep1Complete || editStep === "1";
 
-  // Step 1b: Upsell Details
   const isUpsellFormComplete = !hasUpsell || (!!job2 && !!incomeLow2);
   const isUpsellActive = (isStep1Complete && hasUpsell && !isUpsellFormComplete) || (hasUpsell && editStep === "1b");
 
-  // Step 2: Plan
   const isStep2Complete = isStep1Complete && isUpsellFormComplete && !!selectedPriceId;
   const isStep2Active = (isStep1Complete && isUpsellFormComplete && !isStep2Complete) || editStep === "2";
 
-  // Step 3: Final Details
   const isStep3Complete = !!intentId; 
   const isStep3Active = (isStep2Complete && !isStep3Complete) || editStep === "3";
 
-  // Step 4: Payment
   const isStep4Active = isStep3Complete && editStep !== "3";
 
   // ---- Stripe Data ----
@@ -132,9 +127,8 @@ export default async function SignupPage({ searchParams }) {
   try { jobTitles = await sql`SELECT DISTINCT title FROM job_titles ORDER BY title ASC`; } 
   catch (error) { console.error("DB Error:", error); }
 
-  // ---- Helper Variables ----
   const allParamsObj = {
-      intent: intentId, type: accountType, firstName, lastName, email, company, phone,
+      intent: intentId, type: accountType, firstName, lastName, userTitle, email, company, phone,
       address1, address2, city, state, zip,
       job, incomeLow, incomeHigh, incomeRate,
       priceId: selectedPriceId,
@@ -162,25 +156,22 @@ export default async function SignupPage({ searchParams }) {
   );
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans">
+    <div className="min-h-screen bg-white text-gray-900 font-sans relative">
       
+      {/* 🔴 TOAST */}
+      <RealTimeToast jobTitle={job} />
+
       {/* ================= HEADER ================= */}
       <div className="border-b border-gray-100 bg-white sticky top-0 z-10">
          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            {/* LOGO AREA */}
             <Link href="/" className="block">
                 {LOGO_URL ? (
-                    <img 
-                        src={LOGO_URL} 
-                        alt="Company Logo" 
-                        className="h-10 w-auto object-contain" 
-                    />
+                    <img src={LOGO_URL} alt="Company Logo" className="h-10 w-auto object-contain" />
                 ) : (
                     <div className="font-bold text-xl tracking-tight">JobBoard</div>
                 )}
             </Link>
 
-            {/* TRUST BADGE - CHANGED: Green Lock Icon */}
             <div className="flex items-center gap-1.5 text-xs bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100 text-gray-500 font-medium">
                 <div className="text-green-600"><LockIcon /></div>
                 <span>Secure Checkout</span>
@@ -208,17 +199,20 @@ export default async function SignupPage({ searchParams }) {
 
               {isStep1Active && (
                 <div className="py-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                   <form action={actionStageJob} className="space-y-4">
+                   <form action={actionStageJob} className="space-y-5">
                         {Object.entries(allParamsObj).map(([k,v]) => <input key={k} type="hidden" name={k} value={v} />)}
                         
+                        {/* CONTACT EMAIL */}
                         <div className="space-y-1">
-                            {/* CHANGED: Larger font for visibility */}
                             <label className="text-sm font-bold text-gray-900 ml-1">Contact Email</label>
+                            <p className="text-[11px] text-gray-500 ml-1 mb-1.5">Where should we send candidate applications?</p>
                             <NikeInput name="email" type="email" placeholder="work@company.com" defaultValue={email} required autoFocus />
                         </div>
 
-                        <div className="space-y-1 pt-2">
-                            <label className="text-xs font-bold text-gray-900 ml-1">What role are you hiring for?</label>
+                        {/* JOB ROLE */}
+                        <div className="space-y-1">
+                            <label className="text-sm font-bold text-gray-900 ml-1">Job Role</label>
+                            <p className="text-[11px] text-gray-500 ml-1 mb-1.5">What specific position are you hiring for?</p>
                             <div className="relative">
                                 <select name="job" required defaultValue={job} className="appearance-none border border-gray-300 rounded-lg px-3 py-3 w-full text-sm bg-white focus:border-black focus:ring-1 focus:ring-black outline-none">
                                     <option value="" disabled>Select Job Title*</option>
@@ -228,11 +222,14 @@ export default async function SignupPage({ searchParams }) {
                             </div>
                         </div>
 
+                        {/* LOCATION */}
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-                             <div className="flex items-center gap-2 text-gray-500 mb-1">
+                             <div className="flex items-center gap-2 text-gray-900 mb-1">
                                 <MapPinIcon className="w-4 h-4" />
                                 <span className="text-xs font-bold uppercase tracking-wide">Targeting Location</span>
                              </div>
+                             <p className="text-[11px] text-gray-500 leading-snug">Enter the <strong>exact address</strong> of your shop/office. We use this to find candidates within a 30-mile radius.</p>
+                             
                              <NikeInput name="address1" placeholder="Street Address" defaultValue={address1} required className="bg-white" />
                              <div className="grid grid-cols-2 gap-3">
                                 <NikeInput name="city" placeholder="City" defaultValue={city} required className="bg-white" />
@@ -242,23 +239,41 @@ export default async function SignupPage({ searchParams }) {
                                 <NikeInput name="zip" placeholder="Zip Code" defaultValue={zip} required className="bg-white" />
                                 <NikeInput name="address2" placeholder="Suite (Optional)" defaultValue={address2} className="bg-white" />
                              </div>
-                             <p className="text-[10px] text-gray-400">We use this address to match candidates in your area.</p>
                         </div>
 
-                        <div className="grid grid-cols-12 gap-3 pt-2">
-                            <div className="col-span-4"><NikeInput name="incomeLow" type="number" placeholder="Min Pay" defaultValue={incomeLow} required /></div>
-                            <div className="col-span-4"><NikeInput name="incomeHigh" type="number" placeholder="Max Pay" defaultValue={incomeHigh} required /></div>
-                            <div className="col-span-4 relative">
-                                <select name="incomeRate" required defaultValue={incomeRate} className="appearance-none border border-gray-300 rounded-lg px-3 py-3 w-full text-sm bg-white focus:border-black focus:ring-1 focus:ring-black outline-none">
-                                    <option value="" disabled>Rate*</option>
-                                    <option value="hourly">/hr</option>
-                                    <option value="salary">/yr</option>
-                                </select>
+                        {/* PAY RANGE */}
+                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2">
+                            <div className="flex items-center gap-2 text-gray-900 mb-1">
+                                <span className="text-xs font-bold uppercase tracking-wide">Compensation Range</span>
+                                <span className="bg-white border border-gray-200 text-[10px] px-2 py-0.5 rounded-full text-gray-500">Required</span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 leading-snug mb-2">
+                                Candidates are 40% more likely to apply when they see a clear pay range.
+                            </p>
+
+                            <div className="grid grid-cols-12 gap-3">
+                                <div className="col-span-4">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1 block">Minimum</label>
+                                    <NikeInput name="incomeLow" type="number" placeholder="20" defaultValue={incomeLow} required className="bg-white" />
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1 block">Maximum</label>
+                                    <NikeInput name="incomeHigh" type="number" placeholder="40" defaultValue={incomeHigh} required className="bg-white" />
+                                </div>
+                                <div className="col-span-4 relative">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1 block">Frequency</label>
+                                    <div className="relative">
+                                        <select name="incomeRate" required defaultValue={incomeRate} className="appearance-none border border-gray-300 rounded-lg px-3 py-3 w-full text-sm bg-white focus:border-black focus:ring-1 focus:ring-black outline-none">
+                                            <option value="" disabled>Select...</option>
+                                            <option value="hourly">/ Hour</option>
+                                            <option value="salary">/ Year</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
                         <div className="pt-2">
-                            {/* CHANGED: Button text to 'Next: Select Plan ->' */}
                             <button className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md flex items-center justify-center gap-2">
                                 Next: Select Plan <span className="text-lg leading-none">→</span>
                             </button>
@@ -280,7 +295,7 @@ export default async function SignupPage({ searchParams }) {
               )}
             </div>
 
-            {/* ----- STEP 1b: UPSELL JOB (INJECTED) ----- */}
+            {/* ----- STEP 1b: UPSELL JOB ----- */}
             {hasUpsell && (
                 <div id="step-upsell" className="animate-in fade-in slide-in-from-left-4 duration-500">
                     <SectionHeader 
@@ -379,7 +394,7 @@ export default async function SignupPage({ searchParams }) {
               {isStep2Complete && currentPlan && <div className="py-3 text-gray-500 text-xs"><span className="font-bold text-black">{currentPlan.name}</span> — ${(currentPlan.amount / 100).toFixed(2)}/{currentPlan.interval}</div>}
             </div>
 
-            {/* ----- STEP 3: FINAL DETAILS ----- */}
+            {/* ----- STEP 3: FINAL DETAILS (UPDATED) ----- */}
             <div id="step-3">
               <SectionHeader 
                 title="3. Final Details" 
@@ -406,8 +421,13 @@ export default async function SignupPage({ searchParams }) {
                                 <NikeInput name="lastName" placeholder="Last Name" defaultValue={lastName} required />
                             </div>
 
+                            {/* 🟢 UPDATED: ADDED USER ROLE TITLE */}
                             <div className="grid grid-cols-2 gap-3">
+                                <NikeInput name="userTitle" placeholder="Your Job Title" defaultValue={userTitle} required />
                                 <NikeInput name="company" placeholder={accountType === 'corporate' ? "Corporate Name" : "Company Name"} defaultValue={company} required />
+                            </div>
+
+                            <div className="grid grid-cols-1">
                                 <NikeInput name="phone" placeholder="Phone Number" defaultValue={phone} required />
                             </div>
 
@@ -429,6 +449,8 @@ export default async function SignupPage({ searchParams }) {
                     <div>
                         <p className="font-bold text-black text-sm">{company}</p>
                         <p>{firstName} {lastName}</p>
+                        {/* Optionally show title in summary if desired */}
+                        {userTitle && <p className="text-[10px] opacity-75">{userTitle}</p>}
                     </div>
                     <div className="text-right">
                          <p>{email}</p>
@@ -479,55 +501,71 @@ export default async function SignupPage({ searchParams }) {
 
           {/* ================= RIGHT COLUMN (SUMMARY) ================= */}
           <div className="hidden lg:block sticky top-8 h-fit">
-             <div className="border border-gray-200 rounded-xl p-6 shadow-sm">
-                 <h2 className="text-lg font-medium mb-4">Order Summary</h2>
-                 {currentPlan ? (
-                     <div className="flex gap-3 mb-4 animate-in fade-in">
+              <div className="border border-gray-200 rounded-xl p-6 shadow-sm bg-white">
+                  <h2 className="text-lg font-medium mb-4">Order Summary</h2>
+                  {currentPlan ? (
+                      <div className="flex gap-3 mb-4 animate-in fade-in">
                         <div className="w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center text-gray-400 border border-gray-200"><BagIcon /></div>
                         <div>
                             <p className="font-bold text-sm">{currentPlan.name}</p>
                             <p className="text-gray-500 text-xs">{job || "Job Post"}</p>
                             <p className="text-gray-500 text-xs">Qty 1</p>
                         </div>
-                     </div>
-                 ) : (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-gray-400 text-xs">Select plan to see summary.</div>
-                 )}
+                      </div>
+                  ) : (
+                     <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-gray-400 text-xs">Select plan to see summary.</div>
+                  )}
 
-                 <div className="my-4 pt-4 border-t border-dashed border-gray-200">
-                    <OrderBump isChecked={hasUpsell} allParams={currentQueryString} />
-                 </div>
+                  <div className="my-4 pt-4 border-t border-dashed border-gray-200">
+                     <OrderBump isChecked={hasUpsell} allParams={currentQueryString} />
+                  </div>
 
-                 <div className="border-t border-gray-200 pt-3 space-y-1 text-sm">
-                    <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{currentPlan ? `$${(currentPlan.amount / 100).toFixed(2)}` : '—'}</span></div>
-                    {hasUpsell && (
+                  <div className="border-t border-gray-200 pt-3 space-y-1 text-sm">
+                     <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{currentPlan ? `$${(currentPlan.amount / 100).toFixed(2)}` : '—'}</span></div>
+                     {hasUpsell && (
                         <div className="flex justify-between text-green-700 animate-in fade-in">
                             <span>+ Second Job</span>
                             <span>$599.00</span>
                         </div>
-                    )}
-                    <div className="flex justify-between"><span className="text-gray-500">Tax</span><span>$0.00</span></div>
-                    <div className="border-t border-gray-200 pt-3 flex justify-between font-bold text-base mt-1">
+                     )}
+                     <div className="flex justify-between"><span className="text-gray-500">Tax</span><span>$0.00</span></div>
+                     <div className="border-t border-gray-200 pt-3 flex justify-between font-bold text-base mt-1">
                         <span>Total</span>
                         <span>
                             {currentPlan 
                                 ? `$${((currentPlan.amount + (hasUpsell ? 59900 : 0)) / 100).toFixed(2)}` 
                                 : '—'}
                         </span>
-                    </div>
-                 </div>
+                     </div>
+                  </div>
+              </div>
 
-                 <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-100 flex items-start gap-3">
-                    {/* CHANGED: Green Lock Icon */}
-                    <div className="text-green-600 mt-0.5"><LockIcon /></div>
-                    <div>
-                        <div className="text-xs font-bold text-gray-800">Secure SSL Checkout</div>
-                        <p className="text-[10px] text-gray-500 leading-snug mt-1">
-                            Your payment data is encrypted and processed securely by Stripe.
-                        </p>
-                    </div>
+              {/* 🔴 INJECTED: High Demand / Fake Notification */}
+              {/* FIX: ONLY SHOW IF 'job' PARAM EXISTS */}
+              {job && (
+                  <div className="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-right-4 duration-1000">
+                      <div className="flex gap-3">
+                          <div className="text-2xl select-none pt-0.5">🔥</div>
+                          <div>
+                              <h3 className="font-bold text-sm text-gray-900">High Demand</h3>
+                              <p className="text-xs text-gray-700 leading-snug mt-1">
+                                  <span className="font-bold capitalize">{job}</span> in <span className="font-bold capitalize">{city || "your area"}</span> are actively looking for jobs right now. Complete payment to start reaching them.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              )}
+              {/* 🔴 END INJECTION */}
+
+              <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-100 flex items-start gap-3">
+                 <div className="text-green-600 mt-0.5"><LockIcon /></div>
+                 <div>
+                     <div className="text-xs font-bold text-gray-800">Secure SSL Checkout</div>
+                     <p className="text-[10px] text-gray-500 leading-snug mt-1">
+                         Your payment data is encrypted and processed securely by Stripe.
+                     </p>
                  </div>
-             </div>
+              </div>
           </div>
         </div>
       </div>
@@ -575,6 +613,7 @@ async function actionSaveFullProfile(formData) {
             UPDATE signup_intents SET 
             email=${data.email}, 
             company_name=${data.company}, 
+            user_title=${data.userTitle}, 
             phone=${String(data.phone)}, 
             address_1=${data.address1}, 
             address_2=${data.address2}, 
@@ -597,14 +636,14 @@ async function actionSaveFullProfile(formData) {
     } else {
         const result = await sql`
             INSERT INTO signup_intents (
-                email, company_name, phone, 
+                email, company_name, user_title, phone, 
                 address_1, address_2, city, state, zip, 
                 primary_job_title, income_low, income_high, income_rate,
                 stripe_price_id,
                 has_upsell, upsell_job_title, upsell_income_low, upsell_income_high,
                 status
             ) VALUES (
-                ${data.email}, ${data.company}, ${String(data.phone)}, 
+                ${data.email}, ${data.company}, ${data.userTitle}, ${String(data.phone)}, 
                 ${data.address1}, ${data.address2}, ${data.city}, ${data.state}, ${String(data.zip)}, 
                 ${data.job}, ${Number(data.incomeLow)}, ${Number(data.incomeHigh)}, ${data.incomeRate},
                 ${data.priceId},
