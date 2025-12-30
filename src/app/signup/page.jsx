@@ -115,11 +115,27 @@ export default async function SignupPage({ searchParams }) {
 
   const isStep4Active = isStep3Complete && editStep !== "3";
 
-  // ---- Stripe Data ----
-  const prices = await stripe.prices.list({ active: true, expand: ["data.product"] });
-  const plans = prices.data.map((p) => ({
-    priceId: p.id, name: p.product.name, amount: p.unit_amount, interval: p.recurring?.interval,
+  // ---- Stripe Data (UPDATED WITH FILTER) ----
+  // 1. Fetch up to 100 prices to ensure we get them all
+  const prices = await stripe.prices.list({ 
+      active: true, 
+      limit: 100,
+      expand: ["data.product"] 
+  });
+
+  // 2. Filter using the same logic as your route.ts
+  const filteredPrices = prices.data.filter((p) => {
+      return p.metadata['created_in_admin_panel'] === 'true';
+  });
+
+  // 3. Map the filtered prices to plans
+  const plans = filteredPrices.map((p) => ({
+    priceId: p.id, 
+    name: p.product.name, 
+    amount: p.unit_amount, 
+    interval: p.recurring?.interval,
   }));
+  
   const currentPlan = plans.find((p) => p.priceId === selectedPriceId);
 
   // ---- Job Titles ----
@@ -421,7 +437,7 @@ export default async function SignupPage({ searchParams }) {
                                 <NikeInput name="lastName" placeholder="Last Name" defaultValue={lastName} required />
                             </div>
 
-                            {/* 🟢 UPDATED: ADDED USER ROLE TITLE */}
+                            {/* 🟢 ADDED: User Role Title */}
                             <div className="grid grid-cols-2 gap-3">
                                 <NikeInput name="userTitle" placeholder="Your Job Title" defaultValue={userTitle} required />
                                 <NikeInput name="company" placeholder={accountType === 'corporate' ? "Corporate Name" : "Company Name"} defaultValue={company} required />
@@ -449,7 +465,6 @@ export default async function SignupPage({ searchParams }) {
                     <div>
                         <p className="font-bold text-black text-sm">{company}</p>
                         <p>{firstName} {lastName}</p>
-                        {/* Optionally show title in summary if desired */}
                         {userTitle && <p className="text-[10px] opacity-75">{userTitle}</p>}
                     </div>
                     <div className="text-right">
