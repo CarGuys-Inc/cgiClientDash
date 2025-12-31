@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // 2. Determine the correct Backend URL dynamically
     const API_BASE = process.env.NODE_ENV === "production"
       ? "https://dashboard.carguysinc.com" 
-      : "http://localhost:8000";
+      : "http://127.0.0.1:8000";
 
     // 3. Pass them to the external Webhook
     const webhookRes = await fetch(`${API_BASE}/webhook/recruiterflow`, {
