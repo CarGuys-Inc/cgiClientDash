@@ -6,7 +6,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(req: Request) {
-  console.log("🔔 Webhook Triggered"); 
+  console.log("🔔 Webhook Triggered");
 
   const body = await req.text()
   const signature = (await headers()).get('stripe-signature') as string
@@ -21,48 +21,51 @@ export async function POST(req: Request) {
     return new Response(`Webhook Error: ${errorMessage}`, { status: 400 })
   }
 
-  // LOG THE EVENT TYPE SO WE KNOW WHAT IS HAPPENING
   console.log(`➡️ Received Event Type: ${event.type}`);
 
-  // -----------------------------------------------------------------
-  // HANDLING: CHECKOUT SESSION (Hosted Page) OR INVOICE (Custom Form)
-  // -----------------------------------------------------------------
+  // Handle both Checkout Sessions and direct Invoice payments
   if (event.type === 'checkout.session.completed' || event.type === 'invoice.payment_succeeded') {
     
-    // 1. Normalize the data (Invoice and Session objects look different)
-    const session = event.data.object as any; // Using 'any' to handle both types flexibly
+    const session = event.data.object as any; 
     
     const customerEmail = session.customer_email || session.customer_details?.email;
     const customerId = session.customer;
-    const dashboardUrl = process.env.DASHBOARD_URL;
 
-    console.log(`🔍 Processing for: ${customerEmail}`);
+    // Use a single environment variable for the site URL
+    // Make sure this is http://localhost:3000 in your .env
+    const siteUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
 
-    if (customerEmail && dashboardUrl) {
-      // 2. Create Supabase User
+    console.log("-----------------------------------------");
+    console.log("🔍 PROCESSING WEBHOOK:");
+    console.log(`   - Email: ${customerEmail}`);
+    console.log(`   - Site URL: ${siteUrl}`);
+    console.log("-----------------------------------------");
+
+    if (customerEmail) {
       const supabaseAdmin = createAdminClient()
+      
+      console.log('🚀 Generating Magic Link via Supabase Admin...');
+
       const { error } = await supabaseAdmin.auth.signInWithOtp({
-        email: customerEmail,
-        options: {
-          emailRedirectTo: `${dashboardUrl}/auth/callback?next=/dashboard`,
-          data: {
-            is_paid_user: true,
-            stripe_customer_id: customerId as string
-          }
-        }
-      })
+  email: customerEmail,
+  options: {
+    // Point directly to /login instead of /auth/callback
+    emailRedirectTo: `${siteUrl}/login`, 
+    data: {
+      is_paid_user: true,
+      stripe_customer_id: customerId as string
+    }
+  }
+})
 
       if (error) {
         console.error('❌ Supabase Auth Error:', error.message)
       } else {
-        console.log('✅ Supabase Magic Link Sent / User Created');
+        console.log('✅ Success: User created and Magic Link sent.');
       }
       
-      // Note: We skip the Laravel forwarding here because your frontend 
-      // is already doing it via the 'save-signup-data' route.
-      
     } else {
-      console.warn("⚠️ SKIPPED: Missing Email or DASHBOARD_URL");
+      console.warn("⚠️ SKIPPED: customerEmail is missing from the Stripe event.");
     }
   } 
 

@@ -190,7 +190,7 @@ function CheckoutForm(props: StripeFormProps) {
         const saveResult = await saveRes.json();
         if (!saveRes.ok) throw new Error(saveResult.error || "Setup failed.");
 
-        window.location.href = "http://localhost:3001/login?new_signup=true";
+        window.location.href = "/login?new_signup=true";
       }
     } catch (err: any) {
       setError(err.message || "An error occurred.");

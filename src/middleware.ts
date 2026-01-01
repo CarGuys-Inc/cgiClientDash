@@ -1,21 +1,58 @@
-// middleware.ts
-import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export function middleware(req: NextRequest) {
-  // const token = req.cookies.get("sb-xtfpfyklsgehmhxhlmsr-auth-token")?.value;
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
-  // // If no Supabase auth token, redirect to login
-  // if (!token) {
-  //   return NextResponse.redirect(new URL("/login", req.url));
-  // }
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            request.cookies.set(name, value)
+          )
+          response = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
 
-  // Otherwise, let the request continue
-  return NextResponse.next();
+  // This refreshes the session if it exists and checks auth status
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Protect the dashboard: If no user, redirect to login
+  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  return response
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|login|auth/callback).*)",
+    /*
+     * Match all request paths except for:
+     * - api/webhooks (Stripe background events)
+     * - api/save-signup-data (The route your StripeForm calls)
+     * - login (The instruction page)
+     * - auth (Supabase auth processing)
+     * - signup (The page containing the StripeForm)
+     * - static assets (_next/static, etc.)
+     */
+    '/((?!api/webhooks|api/save-signup-data|login|auth|signup|_next/static|_next/image|favicon.ico).*)',
   ],
-};
-
+}
