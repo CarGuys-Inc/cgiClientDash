@@ -30,15 +30,15 @@ function LoginContent() {
       const hash = window.location.hash;
 
       // 1. MANUAL TOKEN EXTRACTION (Strictly Client-Side)
-      if (process.env.APP_ENV !== 'production' && hash && hash.includes("access_token")) {
+      if (hash && hash.includes("access_token")) {
         console.log("⚡ Fragment detected. Manually extracting tokens...");
         
         // Convert hash fragment to search params
         const params = new URLSearchParams(hash.replace("#", "?"));
         const accessToken = params.get("access_token");
         const refreshToken = params.get("refresh_token");
-
-        if (accessToken && refreshToken) {
+        const notLive = process.env.APP_ENV !== 'production';
+        if (notLive && accessToken && refreshToken) {
           console.log("🔑 Tokens found. Injecting session into Supabase...");
           
           // This forces the Supabase client to accept the session and set cookies
