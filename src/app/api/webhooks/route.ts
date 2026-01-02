@@ -48,15 +48,15 @@ export async function POST(req: Request) {
 
       const { error } = await supabaseAdmin.auth.signInWithOtp({
       email: customerEmail,
-      options: {
-        // Point directly to /login instead of /auth/callback
-        emailRedirectTo: `${siteUrl}/login`, 
-        data: {
-          is_paid_user: true,
-          stripe_customer_id: customerId as string
-        }
-      }
-})
+            options: {
+              // Point directly to /login instead of /auth/callback
+              emailRedirectTo: `${siteUrl}/login`, 
+              data: {
+                is_paid_user: true,
+                stripe_customer_id: customerId as string
+              }
+            }
+      })
 
       if (error) {
         console.error('❌ Supabase Auth Error:', error.message)
