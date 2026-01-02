@@ -122,6 +122,8 @@ export default async function SignupPage({ searchParams }) {
       expand: ["data.product"] 
   });
 
+  console.log("Fetched Prices:", prices.data);
+
   // 2. Filter using the same logic as your route.ts
   const filteredPrices = prices.data.filter((p) => {
       return p.metadata['created_in_admin_panel'] === 'true';
@@ -130,9 +132,11 @@ export default async function SignupPage({ searchParams }) {
   // 3. Map the filtered prices to plans
   const plans = filteredPrices.map((p) => ({
     priceId: p.id, 
+    productId: p.product.id,
     name: p.product.name, 
     amount: p.unit_amount, 
     interval: p.recurring?.interval,
+    
   }));
   
   const currentPlan = plans.find((p) => p.priceId === selectedPriceId);

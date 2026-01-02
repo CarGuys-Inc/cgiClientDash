@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const supabaseUserId = user?.id || null;
 
     const body = await req.json();
-
+    console.log("📨 Received signup data:", body);
     // 1. Destructure all fields
     const { 
       firstName, lastName, jobDescription, email, 

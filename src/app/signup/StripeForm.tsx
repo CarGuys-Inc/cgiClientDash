@@ -35,6 +35,8 @@ interface StripeFormProps {
   upsellIncomeMin?: string | number;
   upsellIncomeMax?: string | number;
   upsellIncomeRate?: string;
+
+  stripe_product_id: string;
 }
 
 export default function StripeForm(props: StripeFormProps) {
@@ -183,7 +185,11 @@ function CheckoutForm(props: StripeFormProps) {
             upsellJobName: props.upsellJobName,
             upsellIncomeMin: props.upsellIncomeMin,
             upsellIncomeMax: props.upsellIncomeMax,
-            upsellIncomeRate: props.upsellIncomeRate
+            upsellIncomeRate: props.upsellIncomeRate,
+
+            //stripe data
+            stripe_product_id: props.productId,
+            stripe_price_id: props.priceId,
           }),
         });
 
