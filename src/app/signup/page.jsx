@@ -486,6 +486,7 @@ export default async function SignupPage({ searchParams }) {
                     <ClientOnly>
                         <StripeForm
                             priceId={currentPlan?.priceId}
+                            productId={currentPlan?.productId}
                             firstName={firstName}
                             lastName={lastName}
                             email={email}
@@ -507,6 +508,7 @@ export default async function SignupPage({ searchParams }) {
                             upsellIncomeMin={incomeLow2}
                             upsellIncomeMax={incomeHigh2}
                             upsellIncomeRate={incomeRate2}
+
                         />
                     </ClientOnly>
                     <div className="mt-4 text-center">

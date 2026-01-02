@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       companyAddress, companyCity, companyState, companyZip,
       incomeMin, incomeMax, incomeRate, amountPaid,
       subscriptionName, hasUpsell, upsellJobName,
-      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate
+      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate, stripe_product_id,
     } = body;
 
     console.log("🚀 Forwarding data to Project B for:", email, "User ID:", supabaseUserId);
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
 
     if (!webhookRes.ok) {
       // ... (rest of your error handling logic)
+      console.error("❌ Webhook Error:", await webhookRes.text());
       return NextResponse.json({ error: `Backend Error: ${webhookRes.status}` }, { status: 502 });
     }
 

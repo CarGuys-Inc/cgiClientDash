@@ -14,6 +14,7 @@ const supabase = createClient(
 
 interface StripeFormProps {
   priceId: string;
+  productId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -36,7 +37,6 @@ interface StripeFormProps {
   upsellIncomeMax?: string | number;
   upsellIncomeRate?: string;
 
-  stripe_product_id: string;
 }
 
 export default function StripeForm(props: StripeFormProps) {
