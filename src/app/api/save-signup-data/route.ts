@@ -45,7 +45,7 @@ export async function POST(req: Request) {
         jobName, incomeMin, incomeMax, incomeRate,
         amountPaid, subscriptionName, stripePaymentId,
         hasUpsell, upsellJobName,
-        upsellIncomeMin, upsellIncomeMax, upsellIncomeRate
+        upsellIncomeMin, upsellIncomeMax, upsellIncomeRate, stripe_product_id
       }),
     });
 
