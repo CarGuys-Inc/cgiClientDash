@@ -30,7 +30,7 @@ function LoginContent() {
       const hash = window.location.hash;
 
       // 1. MANUAL TOKEN EXTRACTION (Strictly Client-Side)
-      if (hash && hash.includes("access_token")) {
+      if (process.env.APP_ENV !== 'production' hash && hash.includes("access_token")) {
         console.log("⚡ Fragment detected. Manually extracting tokens...");
         
         // Convert hash fragment to search params
