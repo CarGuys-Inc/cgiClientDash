@@ -13,8 +13,9 @@ const UPSELL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_UPSELL_PRICE_ID!;
 
 export async function POST(req: Request) {
   try {
-    const { priceId, email, hasUpsell } = await req.json();
-
+    // const { priceId, email, hasUpsell } = await req.json();
+    console.log("📨 Create Subscription Request for req:", await req.json());
+    return;
     if (!priceId || !email) {
       return NextResponse.json({ error: "Missing priceId or email" }, { status: 400 });
     }

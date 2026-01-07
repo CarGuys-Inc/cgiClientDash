@@ -75,7 +75,8 @@ function CheckoutForm(props: StripeFormProps) {
           body: JSON.stringify({ 
               priceId: props.priceId, 
               email: props.email,
-              hasUpsell: props.hasUpsell 
+              companyName: props.companyName,
+              hasUpsell: props.hasUpsell
           }),
         });
         
@@ -133,6 +134,7 @@ function CheckoutForm(props: StripeFormProps) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
+                companyName: props.companyName,
                 priceId: props.priceId, 
                 email: props.email,
                 hasUpsell: props.hasUpsell 
