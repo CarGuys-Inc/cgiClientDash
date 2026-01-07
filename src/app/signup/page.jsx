@@ -75,7 +75,10 @@ export default async function SignupPage({ searchParams }) {
   const email = getSafeParam(params.email);
   const company = getSafeParam(params.company);
   const phone = getSafeParam(params.phone);
-  
+  const contactPhone =
+    getSafeParam(params.contactPhone) ||
+    getSafeParam(params.contact_phone) ||
+    "";
   // Location
   const address1 = getSafeParam(params.address1);
   const address2 = getSafeParam(params.address2);
@@ -146,14 +149,15 @@ export default async function SignupPage({ searchParams }) {
   try { jobTitles = await sql`SELECT DISTINCT title FROM job_titles ORDER BY title ASC`; } 
   catch (error) { console.error("DB Error:", error); }
 
-  const allParamsObj = {
-      intent: intentId, type: accountType, firstName, lastName, userTitle, email, company, phone,
-      address1, address2, city, state, zip,
-      job, incomeLow, incomeHigh, incomeRate,
-      priceId: selectedPriceId,
-      upsell: hasUpsell ? "true" : "",
-      job2, incomeLow2, incomeHigh2, incomeRate2
-  };
+    const allParamsObj = {
+        intent: intentId, type: accountType, firstName, lastName, userTitle, email, company, phone,
+        address1, address2, city, state, zip,
+        job, incomeLow, incomeHigh, incomeRate,
+        priceId: selectedPriceId,
+        upsell: hasUpsell ? "true" : "",
+        job2, incomeLow2, incomeHigh2, incomeRate2
+    };
+
   
   const currentQueryString = new URLSearchParams(
       Object.entries(allParamsObj).filter(([_, v]) => v != null && v !== "")
@@ -227,6 +231,23 @@ export default async function SignupPage({ searchParams }) {
                             <p className="text-[11px] text-gray-500 ml-1 mb-1.5">Where should we send candidate applications?</p>
                             <NikeInput name="email" type="email" placeholder="work@company.com" defaultValue={email} required autoFocus />
                         </div>
+                        {/* CONTACT PHONE */}
+                        <div className="space-y-1">
+                        <label className="text-sm font-bold text-gray-900 ml-1">
+                            Contact Phone
+                        </label>
+                        <p className="text-[11px] text-gray-500 ml-1 mb-1.5">
+                            Used if candidates or our team need to reach you directly.
+                        </p>
+                        <NikeInput
+                            name="contactPhone"
+                            type="tel"
+                            placeholder="(555) 555-5555"
+                            defaultValue={contactPhone}
+                            required
+                        />
+                        </div>
+
 
                         {/* JOB ROLE */}
                         <div className="space-y-1">
@@ -492,6 +513,7 @@ export default async function SignupPage({ searchParams }) {
                             email={email}
                             companyName={company}
                             companyPhone={phone}
+                            contactPhone={phone}        // contact (for now same source)
                             companyAddress={`${address1} ${address2}`.trim()}
                             companyCity={city}
                             companyState={state}

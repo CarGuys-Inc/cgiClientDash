@@ -166,33 +166,37 @@ function CheckoutForm(props: StripeFormProps) {
           body: JSON.stringify({
             firstName: props.firstName,
             lastName: props.lastName,
-            jobDescription: fetchedDescription, 
             email: props.email,
+
             companyName: props.companyName,
             jobName: props.jobName,
+
             stripePaymentId: paymentIntent.id,
-            companyPhone: props.companyPhone,
+
+            companyPhone: props.companyPhone,   // billing/business
+            contactPhone: props.contactPhone,   // ✅ hiring contact
+
             companyAddress: props.companyAddress,
             companyCity: props.companyCity,
             companyState: props.companyState,
             companyZip: props.companyZip,
+
             incomeMin: props.incomeMin,
             incomeMax: props.incomeMax,
             incomeRate: props.incomeRate,
             subscriptionName: props.subscriptionName,
             amountPaid: paymentIntent.amount / 100,
-            
-            // Upsell Payload
+
             hasUpsell: props.hasUpsell,
             upsellJobName: props.upsellJobName,
             upsellIncomeMin: props.upsellIncomeMin,
             upsellIncomeMax: props.upsellIncomeMax,
             upsellIncomeRate: props.upsellIncomeRate,
 
-            //stripe data
             stripe_product_id: props.productId,
             stripe_price_id: props.priceId,
-          }),
+          })
+
         });
 
         const saveResult = await saveRes.json();

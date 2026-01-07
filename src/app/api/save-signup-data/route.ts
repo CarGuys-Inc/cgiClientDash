@@ -14,13 +14,37 @@ export async function POST(req: Request) {
     console.log("📨 Received signup data:", body);
     // 1. Destructure all fields
     const { 
-      firstName, lastName, jobDescription, email, 
-      companyName, jobName, stripePaymentId, companyPhone,
-      companyAddress, companyCity, companyState, companyZip,
-      incomeMin, incomeMax, incomeRate, amountPaid,
-      subscriptionName, hasUpsell, upsellJobName,
-      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate, stripe_product_id,
+      firstName,
+      lastName,
+      jobDescription,
+      email,
+
+      companyName,
+      companyPhone,
+      contactPhone, // ✅ NEW
+
+      companyAddress,
+      companyCity,
+      companyState,
+      companyZip,
+
+      jobName,
+      incomeMin,
+      incomeMax,
+      incomeRate,
+      amountPaid,
+      subscriptionName,
+
+      stripePaymentId,
+      stripe_product_id,
+
+      hasUpsell,
+      upsellJobName,
+      upsellIncomeMin,
+      upsellIncomeMax,
+      upsellIncomeRate,
     } = body;
+
 
     console.log("🚀 Forwarding data to Project B for:", email, "User ID:", supabaseUserId);
 
@@ -38,15 +62,39 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         source: "nextjs_checkout",
-        supabaseUserId, // <--- ADDED USER ID HERE
-        firstName, lastName, jobDescription, email,             
-        companyName, companyPhone, companyAddress,
-        companyCity, companyState, companyZip,
-        jobName, incomeMin, incomeMax, incomeRate,
-        amountPaid, subscriptionName, stripePaymentId,
-        hasUpsell, upsellJobName,
-        upsellIncomeMin, upsellIncomeMax, upsellIncomeRate, stripe_product_id
+        supabaseUserId,
+
+        firstName,
+        lastName,
+        jobDescription,
+        email,
+
+        companyName,
+        companyPhone,   // business phone
+        contactPhone,   // ✅ hiring contact phone
+
+        companyAddress,
+        companyCity,
+        companyState,
+        companyZip,
+
+        jobName,
+        incomeMin,
+        incomeMax,
+        incomeRate,
+        amountPaid,
+        subscriptionName,
+        stripePaymentId,
+
+        hasUpsell,
+        upsellJobName,
+        upsellIncomeMin,
+        upsellIncomeMax,
+        upsellIncomeRate,
+
+        stripe_product_id
       }),
+
     });
 
     if (!webhookRes.ok) {
