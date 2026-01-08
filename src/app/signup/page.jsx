@@ -149,14 +149,6 @@ export default async function SignupPage({ searchParams }) {
   try { jobTitles = await sql`SELECT DISTINCT title FROM job_titles ORDER BY title ASC`; } 
   catch (error) { console.error("DB Error:", error); }
 
-    const allParamsObj = {
-        intent: intentId, type: accountType, firstName, lastName, userTitle, email, company, phone,
-        address1, address2, city, state, zip,
-        job, incomeLow, incomeHigh, incomeRate,
-        priceId: selectedPriceId,
-        upsell: hasUpsell ? "true" : "",
-        job2, incomeLow2, incomeHigh2, incomeRate2
-    };
 
     const UTM_KEYS = [
         'utm_source',
@@ -188,9 +180,42 @@ export default async function SignupPage({ searchParams }) {
         contactPhone,
         ...utmParams
     };
+
+    const allParamsObj = {
+    intent: intentId,
+    type: accountType,
+    firstName,
+    lastName,
+    userTitle,
+    email,
+    company,
+    phone,
+    contactPhone,
+
+    address1,
+    address2,
+    city,
+    state,
+    zip,
+
+    job,
+    incomeLow,
+    incomeHigh,
+    incomeRate,
+
+    priceId: selectedPriceId,
+    upsell: hasUpsell ? "true" : "",
+    job2,
+    incomeLow2,
+    incomeHigh2,
+    incomeRate2,
+
+    // ✅ ADD THIS
+    ...utmParams
+    };
+
     const finalFormParams = {
     ...allParamsObj,
-    ...utmParams
     };
     
     const currentQueryString = new URLSearchParams(
