@@ -136,9 +136,9 @@ function LoginContent() {
                 Final Step: Verify Email
               </h3>
               
-              <p className="text-slate-600 mb-6 leading-relaxed">
+              {/* <p className="text-slate-600 mb-6 leading-relaxed">
                 We have sent a <strong>secure magic link</strong> to your email. Please click the link in that email to sign in to your dashboard instantly.
-              </p>
+              </p> */}
               
               <div className="text-sm text-slate-500">
                 <p className="mb-4 italic">Don't see it? Check your spam folder.</p>

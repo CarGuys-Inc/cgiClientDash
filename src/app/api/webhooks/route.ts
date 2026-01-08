@@ -41,32 +41,60 @@ export async function POST(req: Request) {
     console.log(`   - Site URL: ${siteUrl}`);
     console.log("-----------------------------------------");
 
+    // Magic Link
+    // if (customerEmail) {
+    //   const supabaseAdmin = createAdminClient()
+      
+    //   console.log('🚀 Generating Magic Link via Supabase Admin...');
+
+    //   const { error } = await supabaseAdmin.auth.signInWithOtp({
+    //   email: customerEmail,
+    //         options: {
+    //           // Point directly to /login instead of /auth/callback
+    //           emailRedirectTo: `${siteUrl}/login`, 
+    //           data: {
+    //             is_paid_user: true,
+    //             stripe_customer_id: customerId as string
+    //           }
+    //         }
+    //   })
+
+    //   if (error) {
+    //     console.error('❌ Supabase Auth Error:', error.message)
+    //   } else {
+    //     console.log('✅ Success: User created and Magic Link sent.');
+    //   }
+      
+    // } else {
+    //   console.warn("⚠️ SKIPPED: customerEmail is missing from the Stripe event.");
+    // }
+
     if (customerEmail) {
-      const supabaseAdmin = createAdminClient()
-      
-      console.log('🚀 Generating Magic Link via Supabase Admin...');
+        const supabaseAdmin = createAdminClient()
 
-      const { error } = await supabaseAdmin.auth.signInWithOtp({
-      email: customerEmail,
-            options: {
-              // Point directly to /login instead of /auth/callback
-              emailRedirectTo: `${siteUrl}/login`, 
-              data: {
-                is_paid_user: true,
-                stripe_customer_id: customerId as string
-              }
-            }
-      })
+        console.log('🚀 Creating user via Supabase Admin (no email sent)...')
 
-      if (error) {
-        console.error('❌ Supabase Auth Error:', error.message)
+        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+          email: customerEmail,
+          email_confirm: true, // ✅ prevents magic link / confirmation email
+          user_metadata: {
+            is_paid_user: true,
+            stripe_customer_id: customerId as string,
+          },
+        })
+
+        if (error) {
+          console.error('❌ Supabase Admin Error:', error.message)
+        } else {
+          console.log('✅ Success: User created WITHOUT magic link.', {
+            userId: data.user.id,
+            email: data.user.email,
+          })
+        }
       } else {
-        console.log('✅ Success: User created and Magic Link sent.');
+        console.warn('⚠️ SKIPPED: customerEmail is missing from the Stripe event.')
       }
-      
-    } else {
-      console.warn("⚠️ SKIPPED: customerEmail is missing from the Stripe event.");
-    }
+
   } 
 
   return new Response('Success', { status: 200 })
