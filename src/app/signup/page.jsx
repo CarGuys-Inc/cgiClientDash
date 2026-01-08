@@ -167,10 +167,20 @@ export default async function SignupPage({ searchParams }) {
         'utm_id'
     ];
     const utmParams = Object.fromEntries(
-    UTM_KEYS
-        .map((key) => [key, getSafeParam(params[key])])
-        .filter(([_, value]) => value)
-    );
+        UTM_KEYS
+            .map((key) => [key, getSafeParam(params[key])])
+            .filter(([_, value]) => value)
+        );
+
+    const {
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id
+    } = utmParams;
+
     const trackingParams = {
         firstName,
         lastName,
@@ -478,24 +488,16 @@ export default async function SignupPage({ searchParams }) {
                         </div>
 
                         <form action={actionSaveFullProfile} className="space-y-4">
-                            {/* ✅ REQUIRED FOR TRACKING */}
-                                <input
-                                    type="email"
-                                    name="email"
-                                    defaultValue={email}
-                                    style={{ display: "none" }}
-                                />
 
+          
 
-                                {/* ALL PARAMS (ONCE) */}
-                                {Object.entries(finalFormParams).map(([k, v]) => (
-                                    <input key={k} type="hidden" name={k} value={v ?? ""} />
-                                ))}
+                            {/* REQUIRED FOR Msgsndr */}
+                            <input type="email" name="email" defaultValue={email} hidden />
 
-                            {/* end trakcinf fields*/}
-
-                            {Object.entries(allParamsObj).map(([k, v]) => (<input key={k} type="hidden" name={k} value={v ?? ""} />))}
-
+                            {Object.entries(finalFormParams).map(([k, v]) => (
+                                <input key={k} type="hidden" name={k} value={v ?? ""} />
+                            ))}
+       
                             <div className="grid grid-cols-2 gap-3">
                                 <NikeInput name="firstName" placeholder="First Name" defaultValue={firstName} required autoFocus />
                                 <NikeInput name="lastName" placeholder="Last Name" defaultValue={lastName} required />
@@ -513,9 +515,9 @@ export default async function SignupPage({ searchParams }) {
 
                             <div className="pt-2">
                                 <input
-                                type="submit"
-                                value="Go To Payment"
-                                className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md cursor-pointer"
+                                    type="submit"
+                                    value="Go To Payment"
+                                    className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md cursor-pointer"
                                 />
 
                                 <p className="text-[10px] text-center text-gray-500 mt-3">
@@ -549,32 +551,40 @@ export default async function SignupPage({ searchParams }) {
                  <div className="py-4 animate-in fade-in slide-in-from-top-2 duration-500">
                     <ClientOnly>
                         <StripeForm
-                            priceId={currentPlan?.priceId}
-                            productId={currentPlan?.productId}
-                            firstName={firstName}
-                            lastName={lastName}
-                            email={email}
-                            companyName={company}
-                            companyPhone={phone}
-                            contactPhone={phone}        // contact (for now same source)
-                            companyAddress={`${address1} ${address2}`.trim()}
-                            companyCity={city}
-                            companyState={state}
-                            companyZip={zip}
-                            jobName={job}
-                            incomeMin={incomeLow}
-                            incomeMax={incomeHigh}
-                            incomeRate={incomeRate}
-                            subscriptionName={currentPlan?.name}
-                            
-                            // --- UPSELL PROPS ---
-                            hasUpsell={hasUpsell}
-                            upsellJobName={job2}
-                            upsellIncomeMin={incomeLow2}
-                            upsellIncomeMax={incomeHigh2}
-                            upsellIncomeRate={incomeRate2}
+                        priceId={currentPlan?.priceId}
+                        productId={currentPlan?.productId}
+                        firstName={firstName}
+                        lastName={lastName}
+                        email={email}
+                        companyName={company}
+                        companyPhone={phone}
+                        contactPhone={phone}
+                        companyAddress={`${address1} ${address2}`.trim()}
+                        companyCity={city}
+                        companyState={state}
+                        companyZip={zip}
+                        jobName={job}
+                        incomeMin={incomeLow}
+                        incomeMax={incomeHigh}
+                        incomeRate={incomeRate}
+                        subscriptionName={currentPlan?.name}
 
+                        // --- UPSELL PROPS ---
+                        hasUpsell={hasUpsell}
+                        upsellJobName={job2}
+                        upsellIncomeMin={incomeLow2}
+                        upsellIncomeMax={incomeHigh2}
+                        upsellIncomeRate={incomeRate2}
+
+                        // --- UTM PROPS ---
+                        utm_source={utm_source}
+                        utm_medium={utm_medium}
+                        utm_campaign={utm_campaign}
+                        utm_content={utm_content}
+                        utm_term={utm_term}
+                        utm_id={utm_id}
                         />
+
                     </ClientOnly>
                     <div className="mt-4 text-center">
                          <p className="text-[10px] text-gray-400">Cancel anytime.</p>

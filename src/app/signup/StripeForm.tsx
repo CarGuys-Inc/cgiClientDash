@@ -37,6 +37,13 @@ interface StripeFormProps {
   upsellIncomeMax?: string | number;
   upsellIncomeRate?: string;
 
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+  utm_term?: string;
+  utm_id?: string;
+
 }
 
 export default function StripeForm(props: StripeFormProps) {
@@ -195,8 +202,14 @@ function CheckoutForm(props: StripeFormProps) {
 
             stripe_product_id: props.productId,
             stripe_price_id: props.priceId,
-          })
 
+            utm_source: props.utm_source,
+            utm_medium: props.utm_medium,
+            utm_campaign: props.utm_campaign,
+            utm_content: props.utm_content,
+            utm_term: props.utm_term,
+            utm_id: props.utm_id,
+          })
         });
 
         const saveResult = await saveRes.json();
