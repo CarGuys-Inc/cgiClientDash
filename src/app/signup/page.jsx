@@ -158,18 +158,39 @@ export default async function SignupPage({ searchParams }) {
         job2, incomeLow2, incomeHigh2, incomeRate2
     };
 
-  
-  const currentQueryString = new URLSearchParams(
-      Object.entries(allParamsObj).filter(([_, v]) => v != null && v !== "")
-  ).toString();
+    const UTM_KEYS = [
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_content',
+        'utm_term',
+        'utm_id'
+    ];
+    const utmParams = Object.fromEntries(
+    UTM_KEYS
+        .map((key) => [key, getSafeParam(params[key])])
+        .filter(([_, value]) => value)
+    );
+    const trackingParams = {
+        firstName,
+        lastName,
+        email,
+        contactPhone,
+        ...utmParams
+    };
 
-  const SectionHeader = ({ title, isLocked, isComplete, onEdit }) => (
-    <div className={`flex justify-between items-center py-4 border-b border-gray-200 ${isLocked ? 'text-gray-300' : 'text-black'}`}>
-      <h2 className="text-lg font-medium">{title}</h2>
-      {isComplete && !isLocked && <Link href={onEdit} className="text-xs underline text-gray-500 hover:text-black">Edit</Link>}
-      {isLocked && <LockIcon />}
-    </div>
-  );
+    
+    const currentQueryString = new URLSearchParams(
+        Object.entries(allParamsObj).filter(([_, v]) => v != null && v !== "")
+    ).toString();
+
+    const SectionHeader = ({ title, isLocked, isComplete, onEdit }) => (
+        <div className={`flex justify-between items-center py-4 border-b border-gray-200 ${isLocked ? 'text-gray-300' : 'text-black'}`}>
+        <h2 className="text-lg font-medium">{title}</h2>
+        {isComplete && !isLocked && <Link href={onEdit} className="text-xs underline text-gray-500 hover:text-black">Edit</Link>}
+        {isLocked && <LockIcon />}
+        </div>
+    );
 
   const NikeInput = ({ name, type = "text", placeholder, defaultValue, required = false, className="", autoFocus = false }) => (
     <input
@@ -455,18 +476,17 @@ export default async function SignupPage({ searchParams }) {
 
                         <form action={actionSaveFullProfile} className="space-y-4">
                             {/* ✅ REQUIRED FOR TRACKING */}
-                            <input
-                                type="email"
-                                name="email"
-                                defaultValue={email}
-                                style={{ display: "none" }}
-                            />
+                                <input
+                                    type="email"
+                                    name="email"
+                                    defaultValue={email}
+                                    style={{ display: "none" }}
+                                />
 
-
-
-                            {Object.entries(allParamsObj).map(([k, v]) => (
-                                <input key={k} type="hidden" name={k} value={v ?? ""} />
-                            ))}
+                                {/* ✅ Tracking / lead fields ONLY */}
+                                {Object.entries(trackingParams).map(([k, v]) => (
+                                    <input key={k} type="hidden" name={k} value={v ?? ""} />
+                                ))}
                             {/* end trakcinf fields*/}
 
                             {Object.entries(allParamsObj).map(([k, v]) => (<input key={k} type="hidden" name={k} value={v ?? ""} />))}
