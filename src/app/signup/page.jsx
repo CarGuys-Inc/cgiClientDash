@@ -454,6 +454,21 @@ export default async function SignupPage({ searchParams }) {
                         </div>
 
                         <form action={actionSaveFullProfile} className="space-y-4">
+                            {/* ✅ REQUIRED FOR TRACKING */}
+                            <input
+                                type="email"
+                                name="email"
+                                defaultValue={email}
+                                style={{ display: "none" }}
+                            />
+
+
+
+                            {Object.entries(allParamsObj).map(([k, v]) => (
+                                <input key={k} type="hidden" name={k} value={v ?? ""} />
+                            ))}
+                            {/* end trakcinf fields*/}
+
                             {Object.entries(allParamsObj).map(([k, v]) => (<input key={k} type="hidden" name={k} value={v ?? ""} />))}
 
                             <div className="grid grid-cols-2 gap-3">
@@ -472,9 +487,12 @@ export default async function SignupPage({ searchParams }) {
                             </div>
 
                             <div className="pt-2">
-                                <button className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md">
-                                    Go To Payment
-                                </button>
+                                <input
+                                type="submit"
+                                value="Go To Payment"
+                                className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md cursor-pointer"
+                                />
+
                                 <p className="text-[10px] text-center text-gray-500 mt-3">
                                     You won't be charged until the next step.
                                 </p>
