@@ -18,6 +18,7 @@ interface StripeFormProps {
   firstName: string;
   lastName: string;
   email: string;
+  contactPhone: string;
   companyName: string;
   companyPhone: string;
   companyAddress: string;
