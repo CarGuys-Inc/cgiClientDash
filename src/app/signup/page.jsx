@@ -178,7 +178,10 @@ export default async function SignupPage({ searchParams }) {
         contactPhone,
         ...utmParams
     };
-
+    const finalFormParams = {
+    ...allParamsObj,
+    ...utmParams
+    };
     
     const currentQueryString = new URLSearchParams(
         Object.entries(allParamsObj).filter(([_, v]) => v != null && v !== "")
@@ -483,10 +486,12 @@ export default async function SignupPage({ searchParams }) {
                                     style={{ display: "none" }}
                                 />
 
-                                {/* ✅ Tracking / lead fields ONLY */}
-                                {Object.entries(trackingParams).map(([k, v]) => (
+
+                                {/* ALL PARAMS (ONCE) */}
+                                {Object.entries(finalFormParams).map(([k, v]) => (
                                     <input key={k} type="hidden" name={k} value={v ?? ""} />
                                 ))}
+
                             {/* end trakcinf fields*/}
 
                             {Object.entries(allParamsObj).map(([k, v]) => (<input key={k} type="hidden" name={k} value={v ?? ""} />))}
