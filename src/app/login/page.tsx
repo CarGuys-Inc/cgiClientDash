@@ -112,7 +112,7 @@ function LoginContent() {
                 <Car className="text-white w-6 h-6" />
                </div>
                <span className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Dealer<span className="text-red-700">Talent</span>
+                CarGuys<span className="text-red-700"> Inc</span>
                </span>
             </div>
             
@@ -201,9 +201,9 @@ function LoginContent() {
         <div className="relative h-full flex flex-col justify-end p-12 text-white">
           <blockquote className="space-y-4">
             <p className="text-2xl font-medium leading-relaxed">
-              "DealerTalent helped us scale our service department with 10x the speed of traditional agencies."
+              "CarGuys has made the process of finding quality talent in a condensed market easy. I would recommend them without hesitation."
             </p>
-            <footer className="text-lg font-bold text-red-500">— Service Director, Luxury Auto Group</footer>
+            <footer className="text-lg font-bold text-red-500">— Ozzy, Kia Dealership</footer>
           </blockquote>
         </div>
       </div>
