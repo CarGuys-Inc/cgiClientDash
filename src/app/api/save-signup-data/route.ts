@@ -1,56 +1,26 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server"; // Ensure this path is correct for your server client
+import { createClient } from "@/utils/supabase/server"; 
 
 export async function POST(req: Request) {
   try {
     // 1. Await the client creation
     const supabase = await createClient(); 
     
-    // 2. Now you can access .auth
+    // 2. Access auth user
     const { data: { user } } = await supabase.auth.getUser();
     const supabaseUserId = user?.id || null;
 
     const body = await req.json();
-    console.log("📨 Received signup data:", body);
-    // 1. Destructure all fields
+
+    // 3. Destructure all fields - ADDED stripeSubscriptionId
     const { 
-      firstName,
-      lastName,
-      jobDescription,
-      email,
-
-      companyName,
-      companyPhone,
-      contactPhone, // ✅ NEW
-
-      companyAddress,
-      companyCity,
-      companyState,
-      companyZip,
-
-      jobName,
-      incomeMin,
-      incomeMax,
-      incomeRate,
-      amountPaid,
-      subscriptionName,
-
-      stripePaymentId,
-      stripe_product_id,
-
-      hasUpsell,
-      upsellJobName,
-      upsellIncomeMin,
-      upsellIncomeMax,
-      upsellIncomeRate,
-
-      //UTM
-      utm_source,
-      utm_medium,
-      utm_campaign,
-      utm_content,
-      utm_term,
-      utm_id,
+      firstName, lastName, jobDescription, email, 
+      companyName, jobName, stripePaymentId, 
+      stripeSubscriptionId,
+      companyPhone, companyAddress, companyCity, companyState, companyZip,
+      incomeMin, incomeMax, incomeRate, amountPaid,
+      subscriptionName, hasUpsell, upsellJobName,
+      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate
     } = body;
 
     console.log("UTM Parameters:", {
@@ -59,7 +29,7 @@ export async function POST(req: Request) {
 
     // console.log("🚀 Forwarding data to Project B for:", email, "User ID:", supabaseUserId);
 
-    // 2. Determine the correct Backend URL dynamically
+    // 4. Determine the correct Backend URL dynamically
     const API_BASE = process.env.NODE_ENV === "production"
       ? "https://dashboard.carguysinc.com" 
       : "http://127.0.0.1:8000";
@@ -87,6 +57,7 @@ export async function POST(req: Request) {
           incomeMax,
           incomeRate,
 
+    // 5. Pass them to the external Webhook
           hasUpsell,
           upsellJobName,
           upsellIncomeMin,
@@ -118,59 +89,41 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         source: "nextjs_checkout",
-        supabaseUserId,
-
-        firstName,
-        lastName,
-        jobDescription,
-        email,
-
-        companyName,
-        companyPhone,   // business phone
-        contactPhone,   // ✅ hiring contact phone
-
+        supabaseUserId, 
+        firstName, 
+        lastName, 
+        jobDescription, 
+        email,             
+        companyName, 
+        companyPhone, 
         companyAddress,
-        companyCity,
-        companyState,
+        companyCity, 
+        companyState, 
         companyZip,
-
-        jobName,
-        incomeMin,
-        incomeMax,
+        jobName, 
+        incomeMin, 
+        incomeMax, 
         incomeRate,
-        amountPaid,
-        subscriptionName,
+        amountPaid, 
+        subscriptionName, 
         stripePaymentId,
-
-        hasUpsell,
+        stripeSubscriptionId, // <--- FORWARDED TO WEBHOOK
+        hasUpsell, 
         upsellJobName,
-        upsellIncomeMin,
-        upsellIncomeMax,
-        upsellIncomeRate,
-
-        stripe_product_id,
-
-
+        upsellIncomeMin, 
+        upsellIncomeMax, 
+        upsellIncomeRate
       }),
 
     });
 
     if (!webhookRes.ok) {
-      // ... (rest of your error handling logic)
-      console.error("❌ Webhook Error:", await webhookRes.text());
+      const errorText = await webhookRes.text();
+      console.error("❌ WEBHOOK ERROR RESPONSE:", errorText);
       return NextResponse.json({ error: `Backend Error: ${webhookRes.status}` }, { status: 502 });
     }
 
-
-
-    console.log("⚡ Zapier webhook sent");
-  } catch (zapErr: any) {
-    // DO NOT FAIL THE REQUEST FOR ZAPIER
-    console.error("⚠️ Zapier webhook failed:", zapErr.message);
-  }
-
-
-    console.log("✅ Project B confirmed receipt.");
+    console.log("✅ Project B confirmed receipt with Subscription ID.");
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
