@@ -24,6 +24,10 @@ export default function Sidebar() {
         <Link href="/dashboard/allleads" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
           All Leads
         </Link>
+
+        <Link href="/dashboard/add-user" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
+          Add User
+        </Link>
         
 
         <Link href="/dashboard/searchcandidates" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
