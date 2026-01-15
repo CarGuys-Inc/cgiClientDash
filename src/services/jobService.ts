@@ -6,9 +6,11 @@ export interface PipelineData {
 }
 
 export const fetchPipelineData = async (supabase: SupabaseClient): Promise<PipelineData> => {
+  // 1. Get current user session
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Authentication required");
 
+  // 2. Get company_id from client_profiles
   const { data: profile, error: profileError } = await supabase
     .from('client_profiles')
     .select('company_id')
@@ -16,15 +18,22 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
     .single();
 
   if (profileError || !profile?.company_id) {
+    console.error("Profile fetch error:", profileError);
     throw new Error("No company associated with this account");
   }
 
   const companyId = profile.company_id;
 
+  // 3. Fetch Jobs (with Title Join) and Applications
   const [jobsRes, appsRes] = await Promise.all([
     supabase
       .from('job_postings')
-      .select('*')
+      .select(`
+        *,
+        job_titles (
+          title
+        )
+      `) // Join the job_titles table to get the name
       .eq('company_id', companyId)
       .order('created_at', { ascending: false }),
     
@@ -43,12 +52,22 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
 
   if (jobsRes.error) throw jobsRes.error;
 
+  // 4. Map the data to flatten the title for the UI
+  // This ensures job.title is always a string even if the posting table version is null
+  const formattedJobs = (jobsRes.data || []).map(job => ({
+    ...job,
+    title: job.title || job.job_titles?.title || "Untitled Position"
+  }));
+
   return {
-    jobs: jobsRes.data || [],
+    jobs: formattedJobs,
     applicants: appsRes.data || []
   };
 };
 
+/**
+ * Updates job information in the job_postings table
+ */
 export const updateJobInfo = async (
   supabase: SupabaseClient,
   jobId: string,

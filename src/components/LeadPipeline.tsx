@@ -8,14 +8,16 @@ import {
   RotateCcw, Loader2, Building2, Check, X, DollarSign, Settings2, Edit3
 } from 'lucide-react';
 
+// --- Types ---
 interface Job {
   id: string;
-  title: string;
+  title: string; // This will now be populated by the service
   status: string;
   created_at: string;
   income_min?: number;
   income_max?: number;
   description?: string;
+  job_title_id?: string;
 }
 
 interface Applicant {
@@ -35,7 +37,6 @@ export default function JobPipeline() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('OPEN JOBS');
 
-  // --- Modal State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -66,6 +67,7 @@ export default function JobPipeline() {
     if (!selectedJob) return;
     try {
       setIsSaving(true);
+      // Note: We update 'title' in 'job_postings' if the user edits it in the modal
       await updateJobInfo(supabase, selectedJob.id, {
         title: selectedJob.title,
         status: selectedJob.status,
@@ -96,7 +98,7 @@ export default function JobPipeline() {
   }, [jobs, applicants]);
 
   const filteredJobs = jobs.filter(job => 
-    (job?.title || "Untitled").toLowerCase().includes(searchQuery.toLowerCase())
+    (job?.title || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) return (
@@ -108,7 +110,6 @@ export default function JobPipeline() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 font-sans">
-      {/* --- Header & Search --- */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex bg-blue-50/50 p-1 rounded-lg border border-blue-100">
           {['OPEN JOBS', 'PAUSED JOBS', 'CLOSED JOBS', 'ALL JOBS'].map((tab) => (
@@ -128,7 +129,7 @@ export default function JobPipeline() {
       </div>
 
       <div className="max-w-6xl mx-auto space-y-4">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 px-2">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-blue-500" />
             Active Job Pipelines
@@ -143,7 +144,7 @@ export default function JobPipeline() {
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-extrabold text-gray-800">{job.title || "Untitled Position"}</h3>
+                  <h3 className="text-lg font-extrabold text-gray-800">{job.title}</h3>
                   <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-green-200">
                     {job.status || 'open'}
                   </span>
@@ -186,7 +187,7 @@ export default function JobPipeline() {
       {/* --- EDIT MODAL OVERLAY --- */}
       {isModalOpen && selectedJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-blue-500" /> Edit Job Details
@@ -197,7 +198,6 @@ export default function JobPipeline() {
             </div>
 
             <div className="p-8 space-y-6">
-              {/* Job Title */}
               <div className="space-y-2">
                 <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Job Title</label>
                 <input 
@@ -208,7 +208,6 @@ export default function JobPipeline() {
                 />
               </div>
 
-              {/* Status & Compensation Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Status</label>
@@ -245,10 +244,7 @@ export default function JobPipeline() {
             </div>
 
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
-              >
+              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">
                 CANCEL
               </button>
               <button 
