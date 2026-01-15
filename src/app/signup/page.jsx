@@ -75,7 +75,10 @@ export default async function SignupPage({ searchParams }) {
   const email = getSafeParam(params.email);
   const company = getSafeParam(params.company);
   const phone = getSafeParam(params.phone);
-  
+  const contactPhone =
+    getSafeParam(params.contactPhone) ||
+    getSafeParam(params.contact_phone) ||
+    "";
   // Location
   const address1 = getSafeParam(params.address1);
   const address2 = getSafeParam(params.address2);
@@ -122,6 +125,8 @@ export default async function SignupPage({ searchParams }) {
       expand: ["data.product"] 
   });
 
+  console.log("Fetched Prices:", prices.data);
+
   // 2. Filter using the same logic as your route.ts
   const filteredPrices = prices.data.filter((p) => {
       return p.metadata['created_in_admin_panel'] === 'true';
@@ -130,9 +135,11 @@ export default async function SignupPage({ searchParams }) {
   // 3. Map the filtered prices to plans
   const plans = filteredPrices.map((p) => ({
     priceId: p.id, 
+    productId: p.product.id,
     name: p.product.name, 
     amount: p.unit_amount, 
     interval: p.recurring?.interval,
+    
   }));
   
   const currentPlan = plans.find((p) => p.priceId === selectedPriceId);
@@ -142,26 +149,86 @@ export default async function SignupPage({ searchParams }) {
   try { jobTitles = await sql`SELECT DISTINCT title FROM job_titles ORDER BY title ASC`; } 
   catch (error) { console.error("DB Error:", error); }
 
-  const allParamsObj = {
-      intent: intentId, type: accountType, firstName, lastName, userTitle, email, company, phone,
-      address1, address2, city, state, zip,
-      job, incomeLow, incomeHigh, incomeRate,
-      priceId: selectedPriceId,
-      upsell: hasUpsell ? "true" : "",
-      job2, incomeLow2, incomeHigh2, incomeRate2
-  };
-  
-  const currentQueryString = new URLSearchParams(
-      Object.entries(allParamsObj).filter(([_, v]) => v != null && v !== "")
-  ).toString();
 
-  const SectionHeader = ({ title, isLocked, isComplete, onEdit }) => (
-    <div className={`flex justify-between items-center py-4 border-b border-gray-200 ${isLocked ? 'text-gray-300' : 'text-black'}`}>
-      <h2 className="text-lg font-medium">{title}</h2>
-      {isComplete && !isLocked && <Link href={onEdit} className="text-xs underline text-gray-500 hover:text-black">Edit</Link>}
-      {isLocked && <LockIcon />}
-    </div>
-  );
+    const UTM_KEYS = [
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_content',
+        'utm_term',
+        'utm_id'
+    ];
+    const utmParams = Object.fromEntries(
+        UTM_KEYS
+            .map((key) => [key, getSafeParam(params[key])])
+            .filter(([_, value]) => value)
+        );
+
+    const {
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id
+    } = utmParams;
+
+    const trackingParams = {
+        firstName,
+        lastName,
+        email,
+        contactPhone,
+        ...utmParams
+    };
+
+    const allParamsObj = {
+    intent: intentId,
+    type: accountType,
+    firstName,
+    lastName,
+    userTitle,
+    email,
+    company,
+    phone,
+    contactPhone,
+
+    address1,
+    address2,
+    city,
+    state,
+    zip,
+
+    job,
+    incomeLow,
+    incomeHigh,
+    incomeRate,
+
+    priceId: selectedPriceId,
+    upsell: hasUpsell ? "true" : "",
+    job2,
+    incomeLow2,
+    incomeHigh2,
+    incomeRate2,
+
+    // ✅ ADD THIS
+    ...utmParams
+    };
+
+    const finalFormParams = {
+    ...allParamsObj,
+    };
+    
+    const currentQueryString = new URLSearchParams(
+        Object.entries(allParamsObj).filter(([_, v]) => v != null && v !== "")
+    ).toString();
+
+    const SectionHeader = ({ title, isLocked, isComplete, onEdit }) => (
+        <div className={`flex justify-between items-center py-4 border-b border-gray-200 ${isLocked ? 'text-gray-300' : 'text-black'}`}>
+        <h2 className="text-lg font-medium">{title}</h2>
+        {isComplete && !isLocked && <Link href={onEdit} className="text-xs underline text-gray-500 hover:text-black">Edit</Link>}
+        {isLocked && <LockIcon />}
+        </div>
+    );
 
   const NikeInput = ({ name, type = "text", placeholder, defaultValue, required = false, className="", autoFocus = false }) => (
     <input
@@ -223,6 +290,23 @@ export default async function SignupPage({ searchParams }) {
                             <p className="text-[11px] text-gray-500 ml-1 mb-1.5">Where should we send candidate applications?</p>
                             <NikeInput name="email" type="email" placeholder="work@company.com" defaultValue={email} required autoFocus />
                         </div>
+                        {/* CONTACT PHONE */}
+                        <div className="space-y-1">
+                        <label className="text-sm font-bold text-gray-900 ml-1">
+                            Contact Phone
+                        </label>
+                        <p className="text-[11px] text-gray-500 ml-1 mb-1.5">
+                            Used if candidates or our team need to reach you directly.
+                        </p>
+                        <NikeInput
+                            name="contactPhone"
+                            type="tel"
+                            placeholder="(555) 555-5555"
+                            defaultValue={contactPhone}
+                            required
+                        />
+                        </div>
+
 
                         {/* JOB ROLE */}
                         <div className="space-y-1">
@@ -429,8 +513,16 @@ export default async function SignupPage({ searchParams }) {
                         </div>
 
                         <form action={actionSaveFullProfile} className="space-y-4">
-                            {Object.entries(allParamsObj).map(([k, v]) => (<input key={k} type="hidden" name={k} value={v ?? ""} />))}
 
+          
+
+                            {/* REQUIRED FOR Msgsndr */}
+                            <input type="email" name="email" defaultValue={email} hidden />
+
+                            {Object.entries(finalFormParams).map(([k, v]) => (
+                                <input key={k} type="hidden" name={k} value={v ?? ""} />
+                            ))}
+       
                             <div className="grid grid-cols-2 gap-3">
                                 <NikeInput name="firstName" placeholder="First Name" defaultValue={firstName} required autoFocus />
                                 <NikeInput name="lastName" placeholder="Last Name" defaultValue={lastName} required />
@@ -447,9 +539,12 @@ export default async function SignupPage({ searchParams }) {
                             </div>
 
                             <div className="pt-2">
-                                <button className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md">
-                                    Go To Payment
-                                </button>
+                                <input
+                                    type="submit"
+                                    value="Go To Payment"
+                                    className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md cursor-pointer"
+                                />
+
                                 <p className="text-[10px] text-center text-gray-500 mt-3">
                                     You won't be charged until the next step.
                                 </p>
@@ -481,29 +576,40 @@ export default async function SignupPage({ searchParams }) {
                  <div className="py-4 animate-in fade-in slide-in-from-top-2 duration-500">
                     <ClientOnly>
                         <StripeForm
-                            priceId={currentPlan?.priceId}
-                            firstName={firstName}
-                            lastName={lastName}
-                            email={email}
-                            companyName={company}
-                            companyPhone={phone}
-                            companyAddress={`${address1} ${address2}`.trim()}
-                            companyCity={city}
-                            companyState={state}
-                            companyZip={zip}
-                            jobName={job}
-                            incomeMin={incomeLow}
-                            incomeMax={incomeHigh}
-                            incomeRate={incomeRate}
-                            subscriptionName={currentPlan?.name}
-                            
-                            // --- UPSELL PROPS ---
-                            hasUpsell={hasUpsell}
-                            upsellJobName={job2}
-                            upsellIncomeMin={incomeLow2}
-                            upsellIncomeMax={incomeHigh2}
-                            upsellIncomeRate={incomeRate2}
+                        priceId={currentPlan?.priceId}
+                        productId={currentPlan?.productId}
+                        firstName={firstName}
+                        lastName={lastName}
+                        email={email}
+                        companyName={company}
+                        companyPhone={phone}
+                        contactPhone={phone}
+                        companyAddress={`${address1} ${address2}`.trim()}
+                        companyCity={city}
+                        companyState={state}
+                        companyZip={zip}
+                        jobName={job}
+                        incomeMin={incomeLow}
+                        incomeMax={incomeHigh}
+                        incomeRate={incomeRate}
+                        subscriptionName={currentPlan?.name}
+
+                        // --- UPSELL PROPS ---
+                        hasUpsell={hasUpsell}
+                        upsellJobName={job2}
+                        upsellIncomeMin={incomeLow2}
+                        upsellIncomeMax={incomeHigh2}
+                        upsellIncomeRate={incomeRate2}
+
+                        // --- UTM PROPS ---
+                        utm_source={utm_source}
+                        utm_medium={utm_medium}
+                        utm_campaign={utm_campaign}
+                        utm_content={utm_content}
+                        utm_term={utm_term}
+                        utm_id={utm_id}
                         />
+
                     </ClientOnly>
                     <div className="mt-4 text-center">
                          <p className="text-[10px] text-gray-400">Cancel anytime.</p>

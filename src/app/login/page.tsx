@@ -37,8 +37,8 @@ function LoginContent() {
         const params = new URLSearchParams(hash.replace("#", "?"));
         const accessToken = params.get("access_token");
         const refreshToken = params.get("refresh_token");
-
-        if (accessToken && refreshToken) {
+        const notLive = process.env.APP_ENV !== 'production';
+        if (notLive && accessToken && refreshToken) {
           console.log("🔑 Tokens found. Injecting session into Supabase...");
           
           // This forces the Supabase client to accept the session and set cookies
@@ -112,7 +112,7 @@ function LoginContent() {
                 <Car className="text-white w-6 h-6" />
                </div>
                <span className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Dealer<span className="text-red-700">Talent</span>
+                CarGuys<span className="text-red-700"> Inc</span>
                </span>
             </div>
             
@@ -136,9 +136,9 @@ function LoginContent() {
                 Final Step: Verify Email
               </h3>
               
-              <p className="text-slate-600 mb-6 leading-relaxed">
+              {/* <p className="text-slate-600 mb-6 leading-relaxed">
                 We have sent a <strong>secure magic link</strong> to your email. Please click the link in that email to sign in to your dashboard instantly.
-              </p>
+              </p> */}
               
               <div className="text-sm text-slate-500">
                 <p className="mb-4 italic">Don't see it? Check your spam folder.</p>
@@ -201,9 +201,9 @@ function LoginContent() {
         <div className="relative h-full flex flex-col justify-end p-12 text-white">
           <blockquote className="space-y-4">
             <p className="text-2xl font-medium leading-relaxed">
-              "DealerTalent helped us scale our service department with 10x the speed of traditional agencies."
+              "CarGuys has made the process of finding quality talent in a condensed market easy. I would recommend them without hesitation."
             </p>
-            <footer className="text-lg font-bold text-red-500">— Service Director, Luxury Auto Group</footer>
+            <footer className="text-lg font-bold text-red-500">— Ozzy, Kia Dealership</footer>
           </blockquote>
         </div>
       </div>

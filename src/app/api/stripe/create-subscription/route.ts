@@ -13,7 +13,7 @@ const UPSELL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_UPSELL_PRICE_ID!;
 
 export async function POST(req: Request) {
   try {
-    const { priceId, email, hasUpsell } = await req.json();
+    const { priceId, companyName, email, hasUpsell } = await req.json();
 
     if (!priceId || !email) {
       return NextResponse.json({ error: "Missing priceId or email" }, { status: 400 });
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: email,
+        name: companyName,
         metadata: { supabase_id: user.id },
       });
       customerId = customer.id;
