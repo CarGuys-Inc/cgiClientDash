@@ -2,7 +2,7 @@
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -28,8 +28,6 @@ interface StripeFormProps {
   incomeMax: string | number;
   incomeRate: string;
   subscriptionName: string;
-  
-  // --- UPSELL FIELDS ---
   hasUpsell?: boolean; 
   upsellJobName?: string;
   upsellIncomeMin?: string | number;
@@ -53,16 +51,17 @@ function CheckoutForm(props: StripeFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [fetchedDescription, setFetchedDescription] = useState("");
   
-  // 1. Store the secret locally so we don't have to fetch it on click
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  // NEW: Store the subscription ID from the API response
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
-  // 2. Pre-Fetch the Payment Intent (Background)
+  // 2. Pre-Fetch the Payment Intent & Subscription ID
   useEffect(() => {
     let isMounted = true;
 
     async function createPaymentIntent() {
-      // Clear old secret if params changed to prevent paying for wrong plan
       setClientSecret(null);
+      setSubscriptionId(null);
       
       if (!props.priceId || !props.email) return;
 
@@ -80,6 +79,7 @@ function CheckoutForm(props: StripeFormProps) {
         const data = await res.json();
         if (isMounted && data.clientSecret) {
             setClientSecret(data.clientSecret);
+            setSubscriptionId(data.subscriptionId); // Capture the ID here
         }
       } catch (err) {
         console.error("Background intent creation failed", err);
@@ -87,11 +87,9 @@ function CheckoutForm(props: StripeFormProps) {
     }
 
     createPaymentIntent();
-
     return () => { isMounted = false; };
-  }, [props.priceId, props.email, props.hasUpsell]); // Re-run if upsell is toggled
+  }, [props.priceId, props.email, props.hasUpsell]);
 
-  // 3. Fetch description for MAIN job (Visual only)
   useEffect(() => {
     async function getJobDescription() {
       if (!props.jobName) return;
@@ -102,11 +100,7 @@ function CheckoutForm(props: StripeFormProps) {
           .eq("title", props.jobName)
           .single();
 
-        if (error) {
-          console.error("Supabase error fetching description:", error);
-        } else if (data) {
-          setFetchedDescription(data.description || "");
-        }
+        if (data) setFetchedDescription(data.description || "");
       } catch (err) {
         console.error("Unexpected error:", err);
       }
@@ -122,11 +116,11 @@ function CheckoutForm(props: StripeFormProps) {
     setError(null);
 
     try {
-      // 4. Use Pre-Fetched Secret (Or fetch fallback)
       let secret = clientSecret;
+      let subId = subscriptionId;
 
+      // Fallback: If pre-fetch hasn't finished, fetch now
       if (!secret) {
-         // Fallback: If user clicked FAST, fetch it now
          const res = await fetch("/api/stripe/create-subscription", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -139,11 +133,11 @@ function CheckoutForm(props: StripeFormProps) {
          const data = await res.json();
          if (data.error) throw new Error(data.error);
          secret = data.clientSecret;
+         subId = data.subscriptionId;
       }
 
       if (!secret) throw new Error("Payment initialization failed.");
 
-      // 5. Confirm Payment
       const card = elements.getElement(CardElement)!;
       const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(secret, {
         payment_method: { card }
@@ -152,10 +146,7 @@ function CheckoutForm(props: StripeFormProps) {
       if (stripeError) throw new Error(stripeError.message);
 
       if (paymentIntent?.status === "succeeded") {
-        
-        // --- REMOVED 3-SECOND DELAY HERE FOR SPEED ---
-
-        // 6. Save Data
+        // 6. Save Data including the subscriptionId
         const saveRes = await fetch("/api/save-signup-data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -167,6 +158,7 @@ function CheckoutForm(props: StripeFormProps) {
             companyName: props.companyName,
             jobName: props.jobName,
             stripePaymentId: paymentIntent.id,
+            stripeSubscriptionId: subId, // <--- PASSED HERE
             companyPhone: props.companyPhone,
             companyAddress: props.companyAddress,
             companyCity: props.companyCity,
@@ -177,8 +169,6 @@ function CheckoutForm(props: StripeFormProps) {
             incomeRate: props.incomeRate,
             subscriptionName: props.subscriptionName,
             amountPaid: paymentIntent.amount / 100,
-            
-            // Upsell Payload
             hasUpsell: props.hasUpsell,
             upsellJobName: props.upsellJobName,
             upsellIncomeMin: props.upsellIncomeMin,
@@ -210,10 +200,8 @@ function CheckoutForm(props: StripeFormProps) {
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm border border-red-200">{error}</div>}
       <button
         type="submit"
-        // Disable if loading, or if stripe hasn't loaded yet.
-        // We do NOT disable if clientSecret is missing, because handleSubmit has a fallback fetch.
         disabled={loading || !stripe} 
-        className={`bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all`}
+        className="bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all"
       >
         {buttonText}
       </button>
