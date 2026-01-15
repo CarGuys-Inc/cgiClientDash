@@ -17,15 +17,24 @@ export async function POST(req: Request) {
       firstName, lastName, jobDescription, email, 
       companyName, jobName, stripePaymentId, 
       stripeSubscriptionId,
+      stripe_product_id,
+      stripe_price_id,
+      contactPhone,
       companyPhone, companyAddress, companyCity, companyState, companyZip,
       incomeMin, incomeMax, incomeRate, amountPaid,
       subscriptionName, hasUpsell, upsellJobName,
-      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate
+      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate,
+      utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id
     } = body;
 
     console.log("UTM Parameters:", {
       utm_source,
-      utm_medium,});
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      utm_id,
+    });
 
     // console.log("🚀 Forwarding data to Project B for:", email, "User ID:", supabaseUserId);
 
@@ -66,6 +75,7 @@ export async function POST(req: Request) {
 
           stripePaymentId,
           stripe_product_id,
+          stripe_price_id,
           subscriptionName,
           amountPaid,
 
@@ -80,6 +90,10 @@ export async function POST(req: Request) {
           sentAt: new Date().toISOString(),
         }),
       });
+    } catch (zapierError: any) {
+      console.error("Zapier webhook failed:", zapierError?.message || zapierError);
+    }
+
     // 3. Pass them to the external Webhook
     const webhookRes = await fetch(`${API_BASE}/webhook/recruiterflow`, {
       method: "POST",
