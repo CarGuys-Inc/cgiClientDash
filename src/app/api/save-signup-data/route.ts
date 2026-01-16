@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       subscriptionName,
 
       stripePaymentId,
+      stripeSubscriptionId,
       stripe_product_id,
 
       hasUpsell,
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
           upsellIncomeRate,
 
           stripePaymentId,
+          stripeSubscriptionId,
           stripe_product_id,
           subscriptionName,
           amountPaid,
@@ -141,6 +143,7 @@ export async function POST(req: Request) {
         amountPaid,
         subscriptionName,
         stripePaymentId,
+        stripeSubscriptionId,
 
         hasUpsell,
         upsellJobName,
