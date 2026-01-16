@@ -1,11 +1,18 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation'; // Added for navigation
 import { createClient } from '@/utils/supabase/client';
-import { fetchPipelineData, updateJobInfo, fetchApplicantsByBucket } from '@/services/jobService';
 import { 
-  Search, Plus, Info, MoreVertical, Calendar, 
-  RotateCcw, Loader2, Building2, Check, X, DollarSign, Settings2, Edit3, User, ChevronRight, Mail, Phone
+  fetchPipelineData, 
+  updateJobInfo, 
+  fetchApplicantsByBucket, 
+  moveApplicantBucket 
+} from '@/services/jobService';
+import { 
+  Search, Plus, MoreVertical, Calendar, Loader2, 
+  Building2, X, DollarSign, Settings2, Edit3, ChevronRight, 
+  Mail, RefreshCw, Inbox, UserCircle
 } from 'lucide-react';
 
 interface Job {
@@ -16,7 +23,7 @@ interface Job {
   income_min?: number;
   income_max?: number;
   recruiterflow_id?: string;
-  applicantPipeline?: any[]; // To store the nested bucket IDs
+  applicantPipeline?: any[];
   stats?: {
     applied: number;
     qualified: number;
@@ -26,9 +33,10 @@ interface Job {
 
 export default function JobPipeline() {
   const supabase = createClient();
+  const router = useRouter(); // Initialize router
+  
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('OPEN JOBS');
 
@@ -40,7 +48,8 @@ export default function JobPipeline() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerData, setDrawerData] = useState<any[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
-  const [activeBucket, setActiveBucket] = useState<{label: string, title: string} | null>(null);
+  const [activeBucket, setActiveBucket] = useState<{label: string, title: string, job: Job} | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -52,27 +61,42 @@ export default function JobPipeline() {
       const data = await fetchPipelineData(supabase);
       setJobs(data.jobs || []);
     } catch (err: any) {
-      setError(err.message || "Failed to load pipeline data");
+      console.error("Failed to load pipeline data");
     } finally {
       setLoading(false);
     }
   };
 
   const handleOpenDrawer = async (job: Job, bucketLabel: string) => {
-    setActiveBucket({ label: bucketLabel, title: job.title });
+    setActiveBucket({ label: bucketLabel, title: job.title, job });
     setDrawerOpen(true);
     setDrawerLoading(true);
-    setDrawerData([]); // Clear previous data
+    setDrawerData([]); 
     
     try {
       const type = bucketLabel.toLowerCase().replace(' ', '-');
-      // Pass the whole job object so service can find bucket IDs
       const data = await fetchApplicantsByBucket(supabase, job, type);
       setDrawerData(data);
     } catch (err: any) {
       console.error("Detailed Fetch Error:", err.message);
     } finally {
       setDrawerLoading(false);
+    }
+  };
+
+  const handleMove = async (e: React.ChangeEvent<HTMLSelectElement>, applicantId: string, newBucketId: string) => {
+    e.stopPropagation(); // Prevent opening profile when just moving buckets
+    if (!newBucketId) return;
+    setMovingId(applicantId);
+    try {
+      await moveApplicantBucket(supabase, applicantId, newBucketId);
+      setDrawerData(prev => prev.filter(a => a.id !== applicantId));
+      const data = await fetchPipelineData(supabase);
+      setJobs(data.jobs || []);
+    } catch (err) {
+      alert("Failed to move candidate. Please try again.");
+    } finally {
+      setMovingId(null);
     }
   };
 
@@ -95,9 +119,12 @@ export default function JobPipeline() {
     }
   };
 
-  const filteredJobs = jobs.filter(job => 
-    (job?.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredJobs = jobs.filter(job => {
+    const matchesSearch = (job?.title || "").toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeTab === 'OPEN JOBS') return matchesSearch && job.status === 'open';
+    if (activeTab === 'CLOSED JOBS') return matchesSearch && job.status === 'closed';
+    return matchesSearch;
+  });
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
@@ -111,13 +138,25 @@ export default function JobPipeline() {
       {/* Top Navigation */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex bg-blue-50/50 p-1 rounded-lg border border-blue-100">
-          {['OPEN JOBS', 'PAUSED JOBS', 'CLOSED JOBS', 'ALL JOBS'].map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1.5 text-[10px] font-bold tracking-wider rounded-md ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}>{tab}</button>
+          {['OPEN JOBS', 'CLOSED JOBS', 'ALL JOBS'].map((tab) => (
+            <button 
+              key={tab} 
+              onClick={() => setActiveTab(tab)} 
+              className={`px-4 py-1.5 text-[10px] font-bold tracking-wider rounded-md transition-all ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+            >
+              {tab}
+            </button>
           ))}
         </div>
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input type="text" placeholder="Search jobs" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-400 outline-none text-gray-600" />
+          <input 
+            type="text" 
+            placeholder="Search jobs" 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-400 outline-none text-gray-600" 
+          />
         </div>
       </div>
 
@@ -131,43 +170,60 @@ export default function JobPipeline() {
           </button>
         </div>
 
-        {filteredJobs.map((job) => (
-          <div key={job.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 transition-all hover:shadow-md">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-extrabold text-gray-800">{job.title}</h3>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${job.status === 'closed' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-100 text-green-700 border-green-200'}`}>{job.status || 'open'}</span>
+        {filteredJobs.length > 0 ? (
+          filteredJobs.map((job) => (
+            <div key={job.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 transition-all hover:shadow-md">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-extrabold text-gray-800">{job.title}</h3>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${job.status === 'closed' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-100 text-green-700 border-green-200'}`}>{job.status || 'open'}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-[11px] font-bold text-gray-400">
+                    <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Posted: {new Date(job.created_at).toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1 text-blue-500"><DollarSign className="w-3.5 h-3.5" /> Comp: {job.income_min ? `${job.income_min/1000}k - ${job.income_max ? job.income_max/1000 : '?'}k` : 'Not Set'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-[11px] font-bold text-gray-400">
-                  <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Posted: {new Date(job.created_at).toLocaleDateString()}</span>
-                  <span className="flex items-center gap-1 text-blue-500"><DollarSign className="w-3.5 h-3.5" /> Comp: {job.income_min ? `${job.income_min/1000}k - ${job.income_max ? job.income_max/1000 : '?'}k` : 'Not Set'}</span>
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                  <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-[11px] font-bold border border-slate-200 transition-colors">
+                    <Settings2 className="w-4 h-4" /> EDIT JOB INFO
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 w-full lg:w-auto">
-                <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-[11px] font-bold border border-slate-200 transition-colors">
-                  <Settings2 className="w-4 h-4" /> EDIT JOB INFO
-                </button>
-                <button className="p-2 hover:bg-gray-50 rounded-lg text-gray-300"><MoreVertical className="w-5 h-5" /></button>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-3 gap-2 border-t border-gray-50 pt-6">
-              <button onClick={() => handleOpenDrawer(job, 'Applied')} className="text-center hover:bg-slate-50 p-2 rounded-xl group transition-colors">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-blue-500">Applied</p>
-                <p className="text-3xl font-black text-gray-900">{job.stats?.applied || 0}</p>
-              </button>
-              <button onClick={() => handleOpenDrawer(job, 'Qualified')} className="text-center border-x border-gray-50 hover:bg-slate-50 p-2 rounded-xl group transition-colors">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-blue-600">Qualified</p>
-                <p className="text-3xl font-black text-blue-600">{job.stats?.qualified || 0}</p>
-              </button>
-              <button onClick={() => handleOpenDrawer(job, 'Not Qualified')} className="text-center hover:bg-slate-50 p-2 rounded-xl group transition-colors">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-red-500">Not Qualified</p>
-                <p className="text-3xl font-black text-gray-400">{job.stats?.notQualified || 0}</p>
-              </button>
+              <div className="grid grid-cols-3 gap-2 border-t border-gray-50 pt-6">
+                <button onClick={() => handleOpenDrawer(job, 'Applied')} className="text-center hover:bg-slate-50 p-2 rounded-xl group transition-colors">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-blue-500">Applied</p>
+                  <p className="text-3xl font-black text-gray-900">{job.stats?.applied || 0}</p>
+                </button>
+                <button onClick={() => handleOpenDrawer(job, 'Qualified')} className="text-center border-x border-gray-50 hover:bg-slate-50 p-2 rounded-xl group transition-colors">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-blue-600">Qualified</p>
+                  <p className="text-3xl font-black text-blue-600">{job.stats?.qualified || 0}</p>
+                </button>
+                <button onClick={() => handleOpenDrawer(job, 'Not Qualified')} className="text-center hover:bg-slate-50 p-2 rounded-xl group transition-colors">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-red-500">Not Qualified</p>
+                  <p className="text-3xl font-black text-gray-400">{job.stats?.notQualified || 0}</p>
+                </button>
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-3xl border-2 border-dashed border-slate-200 shadow-sm">
+            <div className="bg-slate-50 p-4 rounded-full mb-4">
+              <Inbox className="w-8 h-8 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">No jobs found</h3>
+            <p className="text-sm text-slate-500 max-w-[280px] text-center">
+              We couldn't find any jobs matching your current filter or search criteria.
+            </p>
+            <button 
+              onClick={() => {setSearchQuery(''); setActiveTab('ALL JOBS');}}
+              className="mt-6 text-sm font-bold text-blue-600 hover:text-blue-700 underline underline-offset-4"
+            >
+              Clear all filters
+            </button>
           </div>
-        ))}
+        )}
       </div>
 
       {/* --- APPLICANT DRAWER --- */}
@@ -190,19 +246,45 @@ export default function JobPipeline() {
                 <div className="text-center py-20 text-slate-400 font-medium italic">No candidates found in this category.</div>
               ) : (
                 drawerData.map((item) => (
-                  <div key={item.id} className="p-5 rounded-3xl border border-slate-100 bg-white shadow-sm hover:border-blue-200 transition-all group">
+                  <div 
+                    key={item.id} 
+                    onClick={() => router.push(`/dashboard/leads/${item.id}`)} // Navigate to profile
+                    className="p-5 rounded-3xl border border-slate-100 bg-white shadow-sm hover:border-blue-400 hover:shadow-md transition-all group flex flex-col gap-4 cursor-pointer relative"
+                  >
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 font-black text-lg">
+                      <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 font-black text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
                         {item.first_name?.charAt(0)}{item.last_name?.charAt(0)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors truncate">{item.full_name}</p>
+                        <div className="flex items-center gap-1 justify-between">
+                           <p className="font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors truncate">{item.full_name}</p>
+                           <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600" />
+                        </div>
                         <div className="flex flex-col gap-1 mt-1">
-                          <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium"><Mail className="w-3 h-3" /> {item.email}</span>
-                          {item.phone && <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium"><Phone className="w-3 h-3" /> {item.phone}</span>}
+                          <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium truncate"><Mail className="w-3 h-3" /> {item.email}</span>
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-slate-300 self-center" />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Move to Stage</label>
+                        <select 
+                          disabled={movingId === item.id}
+                          onClick={(e) => e.stopPropagation()} // Stop click from triggering router.push
+                          onChange={(e) => handleMove(e, item.id, e.target.value)}
+                          className="w-full bg-slate-50 border-none text-[11px] font-bold text-blue-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2 cursor-pointer"
+                          value=""
+                        >
+                          <option value="" disabled>Select a stage...</option>
+                          {activeBucket?.job?.applicantPipeline?.[0]?.statusBuckets.map((bucket: any) => (
+                            <option key={bucket.id} value={bucket.id}>{bucket.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {movingId === item.id && (
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-500 ml-3 self-end mb-2" />
+                      )}
                     </div>
                   </div>
                 ))
@@ -212,8 +294,80 @@ export default function JobPipeline() {
         </div>
       </div>
 
-      {/* Edit Modal Logic (Existing) */}
-      {/* ... (Same as your previous Edit Modal code) ... */}
+      {/* Edit Modal (Existing logic) */}
+      {isModalOpen && selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8">
+             <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-blue-500" /> Edit Job Details
+                </h2>
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6"/></button>
+             </div>
+
+             <div className="space-y-4 mb-8">
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Job Title</label>
+                 <input 
+                   type="text" 
+                   value={selectedJob.title}
+                   onChange={(e) => setSelectedJob({...selectedJob, title: e.target.value})}
+                   className="w-full p-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700 outline-none"
+                 />
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Status</label>
+                   <select 
+                     value={selectedJob.status}
+                     onChange={(e) => setSelectedJob({...selectedJob, status: e.target.value})}
+                     className="w-full p-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700 outline-none appearance-none"
+                   >
+                     <option value="open">OPEN</option>
+                     <option value="closed">CLOSED</option>
+                   </select>
+                 </div>
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider text-blue-500">Min Pay ($)</label>
+                   <input 
+                     type="number" 
+                     value={selectedJob.income_min || 0}
+                     onChange={(e) => setSelectedJob({...selectedJob, income_min: Number(e.target.value)})}
+                     className="w-full p-4 rounded-2xl bg-blue-50 border-none focus:ring-2 focus:ring-blue-500 font-bold text-blue-700 outline-none"
+                   />
+                 </div>
+               </div>
+
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider text-blue-500">Max Pay ($)</label>
+                 <input 
+                   type="number" 
+                   value={selectedJob.income_max || 0}
+                   onChange={(e) => setSelectedJob({...selectedJob, income_max: Number(e.target.value)})}
+                   className="w-full p-4 rounded-2xl bg-blue-50 border-none focus:ring-2 focus:ring-blue-500 font-bold text-blue-700 outline-none"
+                 />
+               </div>
+             </div>
+
+             <div className="flex gap-3">
+               <button 
+                 onClick={() => setIsModalOpen(false)} 
+                 className="flex-1 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+               >
+                 CANCEL
+               </button>
+               <button 
+                 onClick={handleUpdateJob} 
+                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all flex justify-center items-center"
+                 disabled={isSaving}
+               >
+                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : "SAVE CHANGES"}
+               </button>
+             </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

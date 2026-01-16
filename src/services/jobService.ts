@@ -8,11 +8,9 @@ export interface PipelineData {
  * Fetches the main pipeline data including nested bucket counts
  */
 export const fetchPipelineData = async (supabase: SupabaseClient): Promise<PipelineData> => {
-  // 1. Get current user session
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Authentication required");
 
-  // 2. Get company_id from client_profiles
   const { data: profile, error: profileError } = await supabase
     .from('client_profiles')
     .select('company_id')
@@ -26,7 +24,6 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
 
   const clientCompanyId = profile.company_id;
 
-  // 3. Fetch Jobs with the nested count logic
   const { data, error } = await supabase
     .from('job_postings')
     .select(`
@@ -51,21 +48,11 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
     .eq('company_id', clientCompanyId)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error("Supabase Query Error:", error);
-    throw error;
-  }
+  if (error) throw error;
 
-  // 4. Map the data to flatten counts and handle Title joins
   const formattedJobs = (data || []).map(job => {
     const buckets = job.applicantPipeline?.[0]?.statusBuckets || [];
-    
-    // Aggregate counts into dashboard categories
-    const stats = {
-      applied: 0,
-      qualified: 0,
-      notQualified: 0
-    };
+    const stats = { applied: 0, qualified: 0, notQualified: 0 };
 
     buckets.forEach((bucket: any) => {
       const count = bucket.bucket_count?.[0]?.count || 0;
@@ -80,10 +67,7 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
       }
     });
 
-    // Fix: job_titles is returned as an array; take the first element
-    const joinedTitle = Array.isArray(job.job_titles) 
-      ? job.job_titles[0]?.title 
-      : (job.job_titles as any)?.title;
+    const joinedTitle = Array.isArray(job.job_titles) ? job.job_titles[0]?.title : (job.job_titles as any)?.title;
 
     return {
       ...job,
@@ -92,21 +76,17 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
     };
   });
 
-  return {
-    jobs: formattedJobs
-  };
+  return { jobs: formattedJobs };
 };
 
 /**
  * Fetches specific applicants FROM THE APPLICANTS TABLE for a job based on the bucket label clicked in the UI.
- * Uses the join table: applicant_status_bucket_applicant
  */
 export const fetchApplicantsByBucket = async (
   supabase: SupabaseClient,
-  job: any, // Expects the full job object from the state
+  job: any,
   bucketType: string
 ) => {
-  // 1. Identify which bucket IDs match the UI category (Applied, Qualified, Not Qualified)
   const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
   
   const targetBucketIds = allBuckets
@@ -117,14 +97,12 @@ export const fetchApplicantsByBucket = async (
 
       if (bucketType === 'qualified') return isQualified;
       if (bucketType === 'not-qualified') return isRejected;
-      // Default to 'applied' for anything else
       return !isQualified && !isRejected;
     })
     .map((b: any) => b.id);
 
   if (targetBucketIds.length === 0) return [];
 
-  // 2. Query the join table using the identified bucket IDs
   const { data, error } = await supabase
     .from('applicant_status_bucket_applicant')
     .select(`
@@ -140,12 +118,8 @@ export const fetchApplicantsByBucket = async (
     `)
     .in('status_bucket_id', targetBucketIds);
 
-  if (error) {
-    console.error("Join Table Query Error:", error);
-    throw error;
-  }
+  if (error) throw error;
 
-  // 3. Format response for the UI
   return (data || []).map((item: any) => ({
     ...item.applicant,
     full_name: `${item.applicant.first_name} ${item.applicant.last_name}`
@@ -153,25 +127,31 @@ export const fetchApplicantsByBucket = async (
 };
 
 /**
- * Updates job information in the job_postings table
+ * NEW: Updates the applicant's bucket in the junction table
  */
+export const moveApplicantBucket = async (
+  supabase: SupabaseClient,
+  applicantId: string,
+  newBucketId: string
+) => {
+  const { data, error } = await supabase
+    .from('applicant_status_bucket_applicant')
+    .update({ status_bucket_id: newBucketId })
+    .eq('applicant_id', applicantId)
+    .select();
+
+  if (error) throw error;
+  return data;
+};
+
 export const updateJobInfo = async (
   supabase: SupabaseClient,
   jobId: string,
-  updates: { 
-    title?: string; 
-    status?: string; 
-    income_min?: number; 
-    income_max?: number;
-    description?: string;
-  }
+  updates: any
 ) => {
   const { data, error } = await supabase
     .from('job_postings')
-    .update({ 
-      ...updates,
-      updated_at: new Date().toISOString() 
-    })
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', jobId)
     .select();
 
