@@ -62,7 +62,6 @@ function CheckoutForm(props: StripeFormProps) {
   const [fetchedDescription, setFetchedDescription] = useState("");
   
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  // NEW: Store the subscription ID from the API response
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
   // 2. Pre-Fetch the Payment Intent & Subscription ID
@@ -88,9 +87,9 @@ function CheckoutForm(props: StripeFormProps) {
         });
         
         const data = await res.json();
-        if (isMounted && data.clientSecret) {
-            setClientSecret(data.clientSecret);
-            setSubscriptionId(data.subscriptionId); // Capture the ID here
+        if (isMounted) {
+          if (data.clientSecret) setClientSecret(data.clientSecret);
+          if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
         }
       } catch (err) {
         console.error("Background intent creation failed", err);
@@ -145,7 +144,10 @@ function CheckoutForm(props: StripeFormProps) {
          const data = await res.json();
          if (data.error) throw new Error(data.error);
          secret = data.clientSecret;
-         subId = data.subscriptionId;
+         if (data.subscriptionId) {
+           subId = data.subscriptionId;
+           setSubscriptionId(data.subscriptionId);
+         }
       }
 
       if (!secret) throw new Error("Payment initialization failed.");
@@ -171,7 +173,7 @@ function CheckoutForm(props: StripeFormProps) {
             jobName: props.jobName,
 
             stripePaymentId: paymentIntent.id,
-            stripeSubscriptionId: subId, // <--- PASSED HERE
+            stripeSubscriptionId: subId,
             companyPhone: props.companyPhone,   // billing/business
             contactPhone: props.contactPhone,   // ✅ hiring contact
 

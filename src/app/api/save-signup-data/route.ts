@@ -14,17 +14,44 @@ export async function POST(req: Request) {
 
     // 3. Destructure all fields - ADDED stripeSubscriptionId
     const { 
-      firstName, lastName, jobDescription, email, 
-      companyName, jobName, stripePaymentId, 
+      firstName,
+      lastName,
+      jobDescription,
+      email,
+
+      companyName,
+      companyPhone,
+      contactPhone,
+
+      companyAddress,
+      companyCity,
+      companyState,
+      companyZip,
+
+      jobName,
+      incomeMin,
+      incomeMax,
+      incomeRate,
+      amountPaid,
+      subscriptionName,
+
+      stripePaymentId,
       stripeSubscriptionId,
       stripe_product_id,
       stripe_price_id,
-      contactPhone,
-      companyPhone, companyAddress, companyCity, companyState, companyZip,
-      incomeMin, incomeMax, incomeRate, amountPaid,
-      subscriptionName, hasUpsell, upsellJobName,
-      upsellIncomeMin, upsellIncomeMax, upsellIncomeRate,
-      utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id
+
+      hasUpsell,
+      upsellJobName,
+      upsellIncomeMin,
+      upsellIncomeMax,
+      upsellIncomeRate,
+
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      utm_id,
     } = body;
 
     console.log("UTM Parameters:", {
@@ -74,6 +101,7 @@ export async function POST(req: Request) {
           upsellIncomeRate,
 
           stripePaymentId,
+          stripeSubscriptionId,
           stripe_product_id,
           stripe_price_id,
           subscriptionName,
@@ -110,6 +138,7 @@ export async function POST(req: Request) {
         email,             
         companyName, 
         companyPhone, 
+        contactPhone,
         companyAddress,
         companyCity, 
         companyState, 
@@ -126,7 +155,8 @@ export async function POST(req: Request) {
         upsellJobName,
         upsellIncomeMin, 
         upsellIncomeMax, 
-        upsellIncomeRate
+        upsellIncomeRate,
+        stripe_product_id
       }),
 
     });
