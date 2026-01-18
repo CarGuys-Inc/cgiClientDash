@@ -1,61 +1,100 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
+import { 
+  ChevronLeft, 
+  Menu, 
+  LayoutDashboard, 
+  ClipboardList, 
+  Repeat, 
+  Users, 
+  UserPlus, 
+  Calendar, 
+  Search, 
+  BarChart3, 
+  Settings 
+} from 'lucide-react';
 
 export default function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  const logoUrl = "https://storage.googleapis.com/general_images_airesumescoring_public/carguysinc_images_public/misc_images/cgi-logo-white-transparent.png";
+
+  const navItems = [
+    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
+    { href: "/dashboard/leads", label: "Jobs Pipeline", icon: <ClipboardList size={20} /> },
+    { href: "/dashboard/sequences", label: "Sequences", icon: <Repeat size={20} /> },
+    { href: "/dashboard/all-applicants", label: "All Applicants", icon: <Users size={20} /> },
+    { href: "/dashboard/add-user", label: "Add User", icon: <UserPlus size={20} /> },
+    { href: "/dashboard/calendar", label: "Calendar", icon: <Calendar size={20} /> },
+    { href: "/dashboard/searchcandidates", label: "Search Candidates", icon: <Search size={20} /> },
+    { href: "/dashboard/marketdatahub", label: "Market Data", icon: <BarChart3 size={20} /> },
+  ];
+
   return (
-    <aside className="w-64 p-6 flex flex-col gap-6 bg-[var(--color-sidebar)] text-[var(--color-sidebar-foreground)] border-r border-[var(--color-sidebar-border)]">
-      <div className="mb-2">
-        <div className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">
-          CARGUYS INC
+    <aside 
+      className={`relative flex flex-col transition-all duration-300 ease-in-out bg-[var(--color-sidebar)] text-[var(--color-sidebar-foreground)] border-r border-[var(--color-sidebar-border)] ${
+        isCollapsed ? 'w-20' : 'w-64'
+      }`}
+    >
+      {/* Collapse Toggle Button */}
+      <button 
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-12 bg-emerald-500 text-white rounded-full p-1 border-2 border-[var(--color-sidebar)] hover:bg-emerald-600 transition-colors z-50"
+      >
+        {isCollapsed ? <Menu size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      {/* Logo Section */}
+      <div className={`p-6 mb-2 flex flex-col ${isCollapsed ? 'items-center' : 'items-start'}`}>
+        <div className="relative h-10 w-full mb-2">
+          {/* Logo Logic: Invert for light mode, normal for dark mode */}
+          <img 
+            src={logoUrl} 
+            alt="Carguys Inc Logo" 
+            className={`h-full object-contain transition-all duration-300 dark:invert-0 invert ${
+              isCollapsed ? 'mx-auto' : 'object-left'
+            }`}
+          />
         </div>
-        <div className="text-lg font-semibold mt-1">Client Dashboard</div>
+        {!isCollapsed && (
+          <div className="text-sm font-bold mt-1 tracking-tight opacity-80">Client Dashboard</div>
+        )}
       </div>
 
-      <nav className="space-y-1 text-sm">
-        <Link href="/dashboard" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Dashboard
-        </Link>
-        <Link href="/dashboard/leads" className="block px-3 py-2 rounded-lg bg-[var(--color-sidebar-primary)] text-[var(--color-sidebar-primary-foreground)] font-medium">
-          Jobs Pipeline
-        </Link>
-        <Link href="/dashboard/sequences" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Sequences
-        </Link>
-
-        <Link href="/dashboard/all-applicants" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          All Applicants
-        </Link>
-
-        <Link href="/dashboard/add-user" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Add User
-        </Link>
-
-        <Link href="/dashboard/calendar" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Calendar
-        </Link>
+      {/* Navigation */}
+      <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
+        {navItems.map((item) => (
+          <Link 
+            key={item.href}
+            href={item.href} 
+            className="flex items-center gap-4 px-3 py-2.5 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition-all group"
+            title={isCollapsed ? item.label : ""}
+          >
+            <span className="shrink-0">{item.icon}</span>
+            {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
+          </Link>
+        ))}
         
-
-        <Link href="/dashboard/searchcandidates" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Search Candidates
-        </Link>
-
-        {/*<Link href="/dashboard/messagecenter" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Inbox
-        </Link>
-        */}
-
-        <Link href="/dashboard/marketdatahub" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Market Data Hub
-        </Link>
-        {/*<Link href="/dashboard/campaigns" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          Campaigns
-        </Link>
-        */}
-        <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">Settings</button>
+        <button className="w-full flex items-center gap-4 px-3 py-2.5 rounded-xl hover:bg-slate-500/10 transition-all">
+          <Settings size={20} />
+          {!isCollapsed && <span className="text-sm font-medium">Settings</span>}
+        </button>
       </nav>
 
-      <div className="mt-auto pt-6 border-t border-[var(--color-sidebar-border)] text-xs text-[var(--color-sidebar-foreground)]">
-        <div className="text-[var(--color-sidebar-foreground)]/80">Logged in as</div>
-        <div className="font-medium text-[var(--color-sidebar-foreground)] mt-1">demo@agent.com</div>
+      {/* Footer / User Profile */}
+      <div className={`mt-auto p-6 border-t border-[var(--color-sidebar-border)] ${isCollapsed ? 'flex justify-center' : ''}`}>
+        {!isCollapsed ? (
+          <div className="text-xs">
+            <div className="opacity-60">Logged in as</div>
+            <div className="font-bold truncate mt-0.5 text-emerald-500">demo@agent.com</div>
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] font-bold text-white">
+            DA
+          </div>
+        )}
       </div>
     </aside>
   );
