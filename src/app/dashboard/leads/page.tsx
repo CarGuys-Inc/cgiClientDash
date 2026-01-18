@@ -10,8 +10,8 @@ export default function LeadsPipelinePage() {
       {/* Content column */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar
-          title="Leads Pipeline"
-          subtitle="Track every lead from first contact to closing."
+          title="Job Pipelines"
+          subtitle="Track every applicant from first contact to hire."
         />
 
         {/* Only the board area scrolls */}

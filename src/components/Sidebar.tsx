@@ -5,7 +5,7 @@ export default function Sidebar() {
     <aside className="w-64 p-6 flex flex-col gap-6 bg-[var(--color-sidebar)] text-[var(--color-sidebar-foreground)] border-r border-[var(--color-sidebar-border)]">
       <div className="mb-2">
         <div className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">
-          RE FollowUp
+          CARGUYS INC
         </div>
         <div className="text-lg font-semibold mt-1">Client Dashboard</div>
       </div>
@@ -20,13 +20,17 @@ export default function Sidebar() {
         <Link href="/dashboard/sequences" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
           Sequences
         </Link>
-        
-        <Link href="/dashboard/allleads" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
-          All Leads
+
+        <Link href="/dashboard/all-applicants" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
+          All Applicants
         </Link>
 
         <Link href="/dashboard/add-user" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
           Add User
+        </Link>
+
+        <Link href="/dashboard/calendar" className="block px-3 py-2 rounded-lg hover:bg-[var(--color-popover)]/60">
+          Calendar
         </Link>
         
 

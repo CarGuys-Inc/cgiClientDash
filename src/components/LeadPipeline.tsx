@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation'; // Added for navigation
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { 
   fetchPipelineData, 
@@ -24,6 +24,7 @@ interface Job {
   income_max?: number;
   recruiterflow_id?: string;
   applicantPipeline?: any[];
+  company?: { name: string }; // Added to interface
   stats?: {
     applied: number;
     qualified: number;
@@ -33,9 +34,10 @@ interface Job {
 
 export default function JobPipeline() {
   const supabase = createClient();
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
   
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [companyName, setCompanyName] = useState<string>(''); // New state for Company Name
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('OPEN JOBS');
@@ -59,7 +61,13 @@ export default function JobPipeline() {
     try {
       setLoading(true);
       const data = await fetchPipelineData(supabase);
-      setJobs(data.jobs || []);
+      const fetchedJobs = data.jobs || [];
+      setJobs(fetchedJobs);
+
+      // Set the company name from the first job entry if available
+      if (fetchedJobs.length > 0 && fetchedJobs[0].company?.name) {
+        setCompanyName(fetchedJobs[0].company.name);
+      }
     } catch (err: any) {
       console.error("Failed to load pipeline data");
     } finally {
@@ -85,7 +93,7 @@ export default function JobPipeline() {
   };
 
   const handleMove = async (e: React.ChangeEvent<HTMLSelectElement>, applicantId: string, newBucketId: string) => {
-    e.stopPropagation(); // Prevent opening profile when just moving buckets
+    e.stopPropagation();
     if (!newBucketId) return;
     setMovingId(applicantId);
     try {
@@ -162,8 +170,10 @@ export default function JobPipeline() {
 
       <div className="max-w-6xl mx-auto space-y-4">
         <div className="flex justify-between items-center mb-4 px-2">
+          {/* UPDATED HEADING: Displays Company Name if found, otherwise falls back to default */}
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-blue-500" /> Active Job Pipelines
+            <Building2 className="w-5 h-5 text-blue-500" /> 
+            {companyName ? `${companyName} - Jobs` : 'Active Job Pipelines'}
           </h2>
           <button className="bg-slate-200 hover:bg-slate-300 text-blue-600 px-4 py-2 rounded-xl shadow-md font-bold text-xs flex items-center gap-2 active:scale-95 transition-all">
             <Plus className="w-4 h-4" /> Add An Additional Job
@@ -294,7 +304,7 @@ export default function JobPipeline() {
         </div>
       </div>
 
-      {/* Edit Modal (Existing logic) */}
+      {/* Edit Modal */}
       {isModalOpen && selectedJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8">
