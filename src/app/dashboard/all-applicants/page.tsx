@@ -112,7 +112,7 @@ export default function AllLeadsPage() {
           </div>
 
           <div className="rounded-xl bg-[var(--color-card)] shadow-sm overflow-hidden border border-[var(--color-border)]">
-            <LeadTable leads={filteredLeads} />
+            <LeadTable  />
           </div>
         </main>
       </div>
