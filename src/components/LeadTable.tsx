@@ -16,19 +16,26 @@ type Lead = {
   lastContact: string;
 };
 
+type LeadTableProps = {
+  leads?: Lead[];
+};
+
 const STATUS_TABS = ['All', 'New', 'Working', 'Hot'] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
 
-export default function LeadTable() {
+export default function LeadTable({ leads: initialLeads }: LeadTableProps) {
   const supabase = createClient();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Initialize state with props if they exist, otherwise empty
+  const [leads, setLeads] = useState<Lead[]>(initialLeads || []);
+  const [loading, setLoading] = useState(!initialLeads);
   const [activeStatus, setActiveStatus] = useState<StatusTab>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   useEffect(() => {
-    async function loadData() {
+    // We use a function expression (const) here to avoid ES5 strict mode issues
+    const loadData = async () => {
       try {
         setLoading(true);
         const data = await fetchAllCompanyApplicants(supabase);
@@ -38,16 +45,22 @@ export default function LeadTable() {
       } finally {
         setLoading(false);
       }
-    }
-    loadData();
-  }, []);
+    };
 
-  // Filter leads by status tab
+    if (!initialLeads) {
+      loadData();
+    } else {
+      setLeads(initialLeads);
+      setLoading(false);
+    }
+  }, [initialLeads, supabase]);
+
+  // 1. Filter leads by status tab
   const filteredByStatus = activeStatus === 'All'
     ? leads
     : leads.filter((lead) => lead.status === activeStatus);
 
-  // Pagination Logic
+  // 2. Pagination Logic
   const totalPages = Math.ceil(filteredByStatus.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedLeads = filteredByStatus.slice(startIndex, startIndex + itemsPerPage);
@@ -107,8 +120,8 @@ export default function LeadTable() {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {paginatedLeads.length > 0 ? (
-              paginatedLeads.map((lead) => (
-                <tr key={lead.id} className="group hover:bg-slate-50/50 transition-colors">
+              paginatedLeads.map((lead, index) => (
+                <tr key={`${lead.id}-${index}`} className="group hover:bg-slate-50/50 transition-colors">
                   <td className="py-5 pr-4 font-extrabold text-slate-800">{lead.name}</td>
                   <td className="py-5 pr-4">
                     <div className="font-bold text-slate-600">{lead.email}</div>
