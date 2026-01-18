@@ -24,12 +24,12 @@ export default function Sidebar() {
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { href: "/dashboard/leads", label: "Jobs Pipeline", icon: <ClipboardList size={20} /> },
-    { href: "/dashboard/sequences", label: "Sequences", icon: <Repeat size={20} /> },
-    { href: "/dashboard/all-applicants", label: "All Applicants", icon: <Users size={20} /> },
+    /*{ href: "/dashboard/sequences", label: "Sequences", icon: <Repeat size={20} /> },*/
+    /*{ href: "/dashboard/all-applicants", label: "All Applicants", icon: <Users size={20} /> },*/
     { href: "/dashboard/add-user", label: "Add User", icon: <UserPlus size={20} /> },
     { href: "/dashboard/calendar", label: "Calendar", icon: <Calendar size={20} /> },
     { href: "/dashboard/searchcandidates", label: "Search Candidates", icon: <Search size={20} /> },
-    { href: "/dashboard/marketdatahub", label: "Market Data", icon: <BarChart3 size={20} /> },
+    /*{ href: "/dashboard/marketdatahub", label: "Market Data", icon: <BarChart3 size={20} /> },*/
   ];
 
   return (
