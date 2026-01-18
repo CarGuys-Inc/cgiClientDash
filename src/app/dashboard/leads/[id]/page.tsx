@@ -12,10 +12,10 @@ export default async function LeadDetailsPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // 1. Fetch Applicant Core Info
+  // 1. Fetch Applicant Core Info (Including resume_url)
   const { data: applicant, error: applicantError } = await supabase
     .from('applicants')
-    .select('*')
+    .select('*, resume_url')
     .eq('id', id)
     .single();
 
@@ -25,7 +25,6 @@ export default async function LeadDetailsPage({
   }
 
   // 2. Fetch all secondary activity linked to this applicant_id
-  // We now pull from your specific 'client_dashboard_notes' table
   const [messagesRes, callsRes, notesRes] = await Promise.all([
     supabase.from('messages').select('*').eq('applicant_id', id).order('created_at', { ascending: false }),
     supabase.from('calls').select('*').eq('applicant_id', id).order('created_at', { ascending: false }),
@@ -44,6 +43,9 @@ export default async function LeadDetailsPage({
     createdAt: applicant.created_at ? new Date(applicant.created_at).toLocaleDateString() : 'N/A',
     lastContact: applicant.last_activity ? new Date(applicant.last_activity).toLocaleDateString() : 'New', 
     
+    // --- FIXED: ADDED RESUME URL TO THE MAPPED DATA ---
+    resume_url: applicant.resume_url || null, 
+
     // Defensive fallbacks for arrays
     tags: applicant.tags || [],
     labels: applicant.labels || [],
@@ -73,12 +75,11 @@ export default async function LeadDetailsPage({
 
     // Activity Feed (Combining everything chronologically)
     activity: [
-      // MAP NOTES FROM YOUR NEW TABLE
       ...(notesRes.data || []).map(n => ({
         id: n.id,
-        type: 'note', // Using 'note' to trigger the pencil icon
+        type: 'note',
         title: 'Internal Note',
-        description: n.body, // Your new table uses 'body'
+        description: n.body,
         timestamp: new Date(n.created_at).toLocaleString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -114,7 +115,6 @@ export default async function LeadDetailsPage({
           subtitle={`${leadData.email} · ${leadData.status}`}
         />
         <main className="flex-1 p-6 overflow-auto bg-slate-950/50">
-          {/* Casting as any to handle minor prop differences */}
           <LeadProfile lead={leadData as any} />
         </main>
       </div>

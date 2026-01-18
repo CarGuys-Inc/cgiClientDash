@@ -81,7 +81,7 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
 
 /**
  * Fetches ALL unique applicants across ALL jobs for the logged-in user's company
- * Uses a Map to prevent duplicate rows if an applicant is in multiple buckets
+ * UPDATED: Included resume_url in the selection
  */
 export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -105,6 +105,7 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
         last_name,
         email,
         mobile,
+        resume_url,
         created_at
       ),
       bucket:applicant_pipeline_status_buckets (
@@ -140,6 +141,7 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
       name: `${app.first_name} ${app.last_name}`,
       email: app.email,
       phone: app.mobile || "N/A",
+      resume_url: app.resume_url, // Mapped resume_url
       source: "Direct Application",
       status: status,
       lastContact: new Date(app.created_at).toLocaleDateString(),
@@ -151,7 +153,8 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
 };
 
 /**
- * Fetches specific applicants for a job based on the UI category (Applied/Qualified/Rejected)
+ * Fetches specific applicants for a job based on the UI category
+ * UPDATED: Included resume_url in the selection
  */
 export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any, bucketType: string) => {
   const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
@@ -171,7 +174,16 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
   const { data, error } = await supabase
     .from('applicant_status_bucket_applicant')
     .select(`
-      applicant:applicants (id, first_name, last_name, email, mobile, created_at, recruiterflow_id)
+      applicant:applicants (
+        id, 
+        first_name, 
+        last_name, 
+        email, 
+        mobile, 
+        resume_url, 
+        created_at, 
+        recruiterflow_id
+      )
     `)
     .in('status_bucket_id', targetBucketIds);
 

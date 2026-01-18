@@ -10,7 +10,7 @@ import {
   X, 
   FileText, 
   CheckCircle2, 
-  Clock 
+  Clock
 } from 'lucide-react';
 import AddNoteForm from './AddNoteForm';
 
@@ -55,6 +55,7 @@ export type LeadProfileProps = {
     name: string;
     status: string;
     source: string;
+    resume_url?: string;
     priceRange?: string;
     journeyStage?: string;
     tags: string[];
@@ -83,6 +84,14 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Timeline');
   const [showNoteForm, setShowNoteForm] = useState(false);
 
+  const handleViewResume = () => {
+    if (lead.resume_url) {
+      window.open(lead.resume_url, '_blank', 'noopener,noreferrer');
+    } else {
+      alert('No resume URL found for this applicant.');
+    }
+  };
+  
   // Filter out only the note-type activities for the Notes tab
   const onlyNotes = lead.activity.filter(item => item.type === 'note');
 
@@ -243,6 +252,14 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
             <button className="w-full px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 text-white font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
               <Mail size={14} /> Send Email
             </button>
+
+            {/* UPDATED RESUME BUTTON */}
+            <button 
+              onClick={handleViewResume}
+              className="w-full px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 text-white font-bold hover:bg-slate-800 hover:border-emerald-500/50 transition-all flex items-center justify-center gap-2"
+            >
+              <FileText size={14} /> View Resume
+            </button>
           </div>
 
           {lead.nextTask && (
@@ -255,32 +272,6 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
           )}
         </div>
 
-        {/* Documents Snapshot */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Files</h3>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{lead.documents.length}</span>
-          </div>
-          
-          {lead.documents.length === 0 ? (
-            <p className="text-[11px] text-slate-600 italic text-center py-2">No documents attached.</p>
-          ) : (
-            <ul className="space-y-3">
-              {lead.documents.slice(0, 3).map((doc) => (
-                <li key={doc.id} className="flex items-center justify-between gap-2 group cursor-pointer">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <FileText size={14} className="text-slate-500 group-hover:text-emerald-400 transition-colors shrink-0" />
-                    <span className="text-[11px] text-slate-300 truncate group-hover:text-white transition-colors">{doc.name}</span>
-                  </div>
-                  <span className="text-[9px] text-slate-600 shrink-0 font-mono uppercase">{doc.type}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <button className="w-full py-2 text-[10px] rounded-lg border border-slate-800 text-slate-500 hover:text-white hover:bg-slate-900 transition-all font-bold">
-            VIEW ALL FILES
-          </button>
-        </div>
       </aside>
     </div>
   );
