@@ -202,7 +202,25 @@ export default function JobPipeline() {
                   <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl text-[11px] font-bold border border-slate-200 dark:border-slate-700 transition-colors">
                     <Settings2 className="w-4 h-4" /> EDIT JOB INFO
                   </button>
-                </div>
+                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all">
+            <Link 
+          href="/add-job-checkout"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
+          >
+         <Plus className="w-4 h-4" /> Swap Job
+            </Link>
+          </button>
+
+          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all">
+            <Link 
+          href="/add-job-checkout"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
+          >
+         <Plus className="w-4 h-4" /> Cancel Job
+            </Link>
+          </button>
+
+                  </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-800 pt-6">

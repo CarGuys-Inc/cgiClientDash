@@ -30,6 +30,7 @@ export default function Sidebar() {
     { href: "/dashboard/calendar", label: "Calendar", icon: <Calendar size={20} /> },
     { href: "/dashboard/searchcandidates", label: "Search Candidates", icon: <Search size={20} /> },
     /*{ href: "/dashboard/marketdatahub", label: "Market Data", icon: <BarChart3 size={20} /> },*/
+    { href: "/dashboard/settings", label: "Settings", icon: <Settings size={20} /> },
   ];
 
   return (
@@ -76,11 +77,6 @@ export default function Sidebar() {
             {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
           </Link>
         ))}
-        
-        <button className="w-full flex items-center gap-4 px-3 py-2.5 rounded-xl hover:bg-slate-500/10 transition-all">
-          <Settings size={20} />
-          {!isCollapsed && <span className="text-sm font-medium">Settings</span>}
-        </button>
       </nav>
 
       {/* Footer / User Profile */}
