@@ -12,8 +12,6 @@ import {
   MessageSquareWarning, 
   Loader2,
   ArrowRight,
-  Phone,
-  Mail,
   Clock
 } from 'lucide-react';
 import Link from 'next/link';
@@ -44,7 +42,6 @@ export default function DashboardHome() {
       const companyId = profile?.company_id;
       if (!companyId) return;
 
-      // Fetch Junction records with Applicant details included for the Inbox
       const { data, error } = await supabase
         .from('applicant_status_bucket_applicant')
         .select(`
@@ -95,7 +92,6 @@ export default function DashboardHome() {
 
         if (!contactedIds.has(item.applicant_id)) {
           ncCount++;
-          // Add to the priority list if they haven't been contacted
           needsContactList.push({
             id: item.applicant.id,
             name: `${item.applicant.first_name} ${item.applicant.last_name}`,
@@ -113,7 +109,6 @@ export default function DashboardHome() {
         needsContact: ncCount
       });
       
-      // Show top 5 most recent applicants needing contact
       setPriorityApplicants(needsContactList.slice(0, 5));
 
     } catch (err) {
@@ -133,7 +128,7 @@ export default function DashboardHome() {
   }, [supabase, getDashboardStats]);
 
   return (
-    <div className="min-h-screen w-full flex bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen w-full flex bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <Sidebar />
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Topbar title="Executive Overview" subtitle="Real-time recruiting performance." />
@@ -153,36 +148,36 @@ export default function DashboardHome() {
             
             {/* LEFT: PRIORITY INBOX */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
                     <MessageSquareWarning size={18} className="text-amber-500" /> Priority Outreach Inbox
                   </h3>
-                  <Link href="/dashboard/all-applicants" className="text-xs font-bold text-indigo-600 hover:underline">View All</Link>
+                  <Link href="/dashboard/all-applicants" className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View All</Link>
                 </div>
                 
-                <div className="divide-y divide-slate-50">
+                <div className="divide-y divide-slate-50 dark:divide-slate-800">
                   {priorityApplicants.length > 0 ? (
                     priorityApplicants.map((app) => (
-                      <div key={app.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
+                      <div key={app.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between group">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs">
+                          <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-400 dark:text-slate-500 text-xs border border-slate-200 dark:border-slate-700">
                             {app.name.charAt(0)}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-800">{app.name}</p>
-                            <p className="text-[10px] text-slate-500 font-medium">{app.job} • Applied {app.date}</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{app.name}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{app.job} • Applied {app.date}</p>
                           </div>
                         </div>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Link href={`/dashboard/leads/${app.id}`} className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100">
+                           <Link href={`/dashboard/leads/${app.id}`} className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
                              <ArrowRight size={14} />
                            </Link>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="p-12 text-center text-slate-400 text-xs font-medium italic">
+                    <div className="p-12 text-center text-slate-400 dark:text-slate-600 text-xs font-medium italic">
                       Inbox clear! All candidates have been contacted.
                     </div>
                   )}
@@ -192,22 +187,22 @@ export default function DashboardHome() {
 
             {/* RIGHT: INTERVIEW SCHEDULE & QUICK STATS */}
             <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                 <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <Calendar size={18} className="text-indigo-500" /> Today's Schedule
                  </h3>
                  <div className="space-y-4">
-                    <div className="flex gap-3 items-start p-3 rounded-xl bg-slate-50 border border-slate-100">
-                       <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600"><Clock size={16}/></div>
+                    <div className="flex gap-3 items-start p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                       <div className="p-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm text-indigo-600 dark:text-indigo-400 border border-slate-100 dark:border-slate-800"><Clock size={16}/></div>
                        <div>
-                          <p className="text-xs font-bold text-slate-800">No interviews today</p>
-                          <p className="text-[10px] text-slate-500">Check the calendar for tomorrow.</p>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">No interviews today</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">Check the calendar for tomorrow.</p>
                        </div>
                     </div>
                  </div>
               </div>
 
-              <div className="bg-indigo-600 rounded-2xl p-6 shadow-lg shadow-indigo-100 text-white relative overflow-hidden">
+              <div className="bg-indigo-600 dark:bg-indigo-700 rounded-2xl p-6 shadow-lg shadow-indigo-100 dark:shadow-none text-white relative overflow-hidden">
                 <div className="relative z-10">
                   <h3 className="text-xs font-bold opacity-80 uppercase tracking-widest mb-4">Hiring Velocity</h3>
                   <p className="text-4xl font-black mb-1">3.8 Days</p>
@@ -226,25 +221,29 @@ export default function DashboardHome() {
 
 function MetricCard({ title, value, icon, color, isAlert, loading }: any) {
   const colors: any = {
-    blue: 'bg-blue-50 text-blue-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    slate: 'bg-slate-50 text-slate-600',
-    indigo: 'bg-indigo-50 text-indigo-600',
-    amber: 'bg-amber-100 text-amber-700',
+    blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+    emerald: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+    slate: 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400',
+    indigo: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400',
+    amber: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
   };
 
   return (
-    <div className={`bg-white p-5 rounded-xl border ${isAlert && value > 0 ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'} shadow-sm relative transition-all hover:shadow-md`}>
+    <div className={`bg-white dark:bg-slate-900 p-5 rounded-xl border transition-all hover:shadow-md ${
+      isAlert && value > 0 
+        ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50/30 dark:bg-amber-500/5 shadow-amber-100 dark:shadow-none' 
+        : 'border-slate-200 dark:border-slate-800 shadow-sm'
+    } relative`}>
       <div className="flex justify-between items-start mb-2">
-        <p className={`text-[10px] font-black uppercase tracking-widest ${isAlert && value > 0 ? 'text-amber-700' : 'text-slate-400'}`}>{title}</p>
+        <p className={`text-[10px] font-black uppercase tracking-widest ${isAlert && value > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>{title}</p>
         <div className={`p-2 rounded-lg ${colors[color]}`}>
           {React.cloneElement(icon, { size: 18 })}
         </div>
       </div>
       {loading ? (
-        <Loader2 className="animate-spin text-slate-200" size={20} />
+        <Loader2 className="animate-spin text-slate-200 dark:text-slate-700" size={20} />
       ) : (
-        <h3 className="text-2xl font-black text-slate-800">{value}</h3>
+        <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">{value}</h3>
       )}
     </div>
   );
