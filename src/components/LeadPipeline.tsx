@@ -11,9 +11,9 @@ import {
   moveApplicantBucket 
 } from '@/services/jobService';
 import { 
-  Search, Plus, MoreVertical, Calendar, Loader2, 
+  Search, Plus, Calendar, Loader2, 
   Building2, X, DollarSign, Settings2, Edit3, ChevronRight, 
-  Mail, RefreshCw, Inbox, UserCircle
+  Mail, RefreshCw, Inbox
 } from 'lucide-react';
 
 interface Job {
@@ -55,7 +55,7 @@ export default function JobPipeline() {
 
   useEffect(() => {
     loadInitialData();
-  }, [supabase]);
+  }, []);
 
   const loadInitialData = async () => {
     try {
@@ -80,7 +80,7 @@ export default function JobPipeline() {
     setDrawerData([]); 
     
     try {
-      const type = bucketLabel.toLowerCase().replace(' ', '-');
+      const type = bucketLabel.toLowerCase().replace(/\s+/g, '-');
       const data = await fetchApplicantsByBucket(supabase, job, type);
       setDrawerData(data);
     } catch (err: any) {
@@ -142,7 +142,6 @@ export default function JobPipeline() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-6 font-sans overflow-x-hidden transition-colors duration-300">
       
-      {/* Top Navigation */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
           {['OPEN JOBS', 'CLOSED JOBS', 'ALL JOBS'].map((tab) => (
@@ -174,14 +173,12 @@ export default function JobPipeline() {
             {companyName ? `${companyName} - Jobs` : 'Active Job Pipelines'}
           </h2>
           
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all">
-            <Link 
-          href="/add-job-checkout"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
+          <Link 
+            href="/add-job-checkout"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
           >
-         <Plus className="w-4 h-4" /> Add Additional Job
-            </Link>
-          </button>
+            <Plus className="w-4 h-4" /> Add Additional Job
+          </Link>
         </div>
 
         {filteredJobs.length > 0 ? (
@@ -202,25 +199,13 @@ export default function JobPipeline() {
                   <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl text-[11px] font-bold border border-slate-200 dark:border-slate-700 transition-colors">
                     <Settings2 className="w-4 h-4" /> EDIT JOB INFO
                   </button>
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all">
-            <Link 
-          href="/add-job-checkout"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
-          >
-         <Plus className="w-4 h-4" /> Swap Job
-            </Link>
-          </button>
-
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all">
-            <Link 
-          href="/add-job-checkout"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
-          >
-         <Plus className="w-4 h-4" /> Cancel Job
-            </Link>
-          </button>
-
-                  </div>
+                  <Link href="/add-job-checkout" className="flex-1 lg:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all justify-center">
+                    Swap Job
+                  </Link>
+                  <Link href="/add-job-checkout" className="flex-1 lg:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all justify-center">
+                    Cancel Job
+                  </Link>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-800 pt-6">
@@ -272,25 +257,21 @@ export default function JobPipeline() {
                 drawerData.map((item) => (
                   <div 
                     key={item.id} 
-  onClick={() => {
-    // 1. Get current bucket label (e.g. "Applied") or fallback to "queue"
-    const bucketLabel = activeBucket?.label?.toLowerCase()?.replace(' ', '-') || 'queue';
-    
-    // 2. Get current Job ID or fallback to empty string
-    const jobId = activeBucket?.job?.id || '';
-
-    router.push(`/dashboard/leads/${item.id}?bucket=${bucketLabel}&jobId=${jobId}`);
-  }}
-  className="p-5 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-all group flex flex-col gap-4 cursor-pointer relative"
->
+                    onClick={() => {
+                      const bucketLabel = activeBucket?.label?.toLowerCase()?.replace(/\s+/g, '-') || 'applied';
+                      const jobId = activeBucket?.job?.id || '';
+                      router.push(`/dashboard/leads/${item.id}?bucket=${bucketLabel}&jobId=${jobId}`);
+                    }}
+                    className="p-5 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-all group flex flex-col gap-4 cursor-pointer relative"
+                  >
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
                         {item.first_name?.charAt(0)}{item.last_name?.charAt(0)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 justify-between">
-                           <p className="font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{item.full_name}</p>
-                           <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-700 group-hover:text-blue-600" />
+                            <p className="font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{item.full_name}</p>
+                            <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-700 group-hover:text-blue-600" />
                         </div>
                         <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium truncate"><Mail className="w-3 h-3" /> {item.email}</span>
                       </div>
