@@ -428,7 +428,7 @@ function ScheduleInterviewModal({ leadName, onClose }: { leadName: string, onClo
             <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-1 px-1">Select Date & Time</label>
             <input type="datetime-local" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/50 font-bold dark:text-white" />
           </div>
-          <button onClick={() => { alert("Feature coming soon."); onClose(); }} className="w-full mt-4 py-3.5 bg-blue-600 text-white dark:text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Confirm</button>
+          <button onClick={() => { alert("Feature coming soon.."); onClose(); }} className="w-full mt-4 py-3.5 bg-blue-600 text-white dark:text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Confirm</button>
         </div>
       </div>
     </div>
