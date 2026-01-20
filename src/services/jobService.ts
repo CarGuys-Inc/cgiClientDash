@@ -142,7 +142,7 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
 
 /**
  * Fetches applicants for a specific bucket category (Applied/Qualified/Rejected)
- * Includes de-duplication to prevent double-listing
+ * Includes de-duplication and STABLE SORTING for navigation
  */
 export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any, bucketType: string) => {
   const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
@@ -155,20 +155,26 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
       
       if (bucketType === 'qualified') return isQualified;
       if (bucketType === 'not-qualified') return isRejected;
+      // Default: Applied (neither qualified nor rejected)
       return !isQualified && !isRejected;
     })
     .map((b: any) => b.id);
 
   if (targetBucketIds.length === 0) return [];
 
+  // 
   const { data, error } = await supabase
     .from('applicant_status_bucket_applicant')
     .select(`
+      applicant_id,
       applicant:applicants (
         id, first_name, last_name, email, mobile, resume_url, created_at, recruiterflow_id
       )
     `)
-    .in('status_bucket_id', targetBucketIds);
+    .in('status_bucket_id', targetBucketIds)
+    // CRITICAL: Stable sort by creation date ensures that index calculations 
+    // for Next/Previous remain consistent across page reloads.
+    .order('created_at', { foreignTable: 'applicants', ascending: false });
 
   if (error) throw error;
 

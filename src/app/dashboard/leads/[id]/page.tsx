@@ -1,120 +1,117 @@
+// dashboard/leads/[id]/page.tsx
 import Sidebar from '@/components/Sidebar';
 import Topbar from '@/components/Topbar';
-import LeadProfile, { type LeadProfileProps } from '@/components/LeadProfile';
+import LeadProfile from '@/components/LeadProfile';
 import { createClient } from '@/utils/supabase/server';
 import { notFound } from 'next/navigation';
+import { fetchApplicantsByBucket } from '@/services/jobService';
 
 export default async function LeadDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ bucket?: string; jobId?: string }>;
 }) {
   const { id } = await params;
+  const { bucket, jobId } = await searchParams;
   const supabase = await createClient();
 
-  // 1. Fetch Applicant Core Info (Including resume_url)
-  const { data: applicant, error: applicantError } = await supabase
+  // 1. Fetch current Applicant core info
+  const { data: applicant, error } = await supabase
     .from('applicants')
     .select('*, resume_url')
     .eq('id', id)
     .single();
 
-  // Handle case where ID doesn't exist
-  if (applicantError || !applicant) {
-    return notFound();
+  if (error || !applicant) return notFound();
+
+  // 2. FETCH THE QUEUE (For Navigation)
+  let idList: string[] = [];
+  if (bucket && jobId) {
+    const { data: jobData } = await supabase
+      .from('job_postings')
+      .select('*, applicantPipeline:applicant_pipelines(statusBuckets:applicant_pipeline_status_buckets(*))')
+      .eq('id', jobId)
+      .single();
+
+    if (jobData) {
+      const applicantsInBucket = await fetchApplicantsByBucket(supabase, jobData, bucket);
+      idList = applicantsInBucket.map((a: any) => a.id);
+    }
   }
 
-  // 2. Fetch all secondary activity linked to this applicant_id
+  // Calculate Neighbors
+  const currentIndex = idList.indexOf(id);
+  const prevId = currentIndex > 0 ? idList[currentIndex - 1] : null;
+  const nextId = currentIndex < idList.length - 1 && currentIndex !== -1 ? idList[currentIndex + 1] : null;
+
+  // 3. FETCH ALL DATA (Including Notes)
   const [messagesRes, callsRes, notesRes] = await Promise.all([
     supabase.from('messages').select('*').eq('applicant_id', id).order('created_at', { ascending: false }),
     supabase.from('calls').select('*').eq('applicant_id', id).order('created_at', { ascending: false }),
     supabase.from('client_dashboard_notes').select('*').eq('applicant_id', id).order('created_at', { ascending: false }),
   ]);
 
-  // 3. Map Data to LeadProfileProps structure
-  const leadData = {
-    id: applicant.id,
-    name: `${applicant.first_name || ''} ${applicant.last_name || ''}`.trim() || "Unnamed Lead",
-    email: applicant.email || "No Email",
-    phone: applicant.mobile || "No Phone",
-    status: applicant.stage || 'New Lead',
-    source: applicant.source || 'Direct',
-    location: applicant.location || 'Unknown',
-    createdAt: applicant.created_at ? new Date(applicant.created_at).toLocaleDateString() : 'N/A',
-    lastContact: applicant.last_activity ? new Date(applicant.last_activity).toLocaleDateString() : 'New', 
-    
-    // --- FIXED: ADDED RESUME URL TO THE MAPPED DATA ---
-    resume_url: applicant.resume_url || null, 
-
-    // Defensive fallbacks for arrays
-    tags: applicant.tags || [],
-    labels: applicant.labels || [],
-    documents: applicant.documents || [],
-    journeyStage: applicant.journey_stage || 'Discovery',
-    priceRange: applicant.price_range || 'N/A',
-    notes: applicant.general_notes || '',
-
-    // Messages Mapping
-    messages: (messagesRes.data || []).map(m => ({
+  // 4. MAP EVERYTHING TO THE ACTIVITY FEED
+  // This is the array that LeadProfile uses to show notes
+  const combinedActivity: any[] = [
+    // --- MAP NOTES (The missing link) ---
+    ...(notesRes.data || []).map(n => ({
+      id: n.id,
+      type: 'note',
+      title: 'Internal Note',
+      description: n.body,
+      timestamp: new Date(n.created_at).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      }),
+    })),
+    // --- MAP MESSAGES ---
+    ...(messagesRes.data || []).map(m => ({
       id: m.id,
-      from: m.direction === 'inbound' ? 'lead' : 'agent',
-      channel: m.type || 'sms',
-      body: m.body,
+      type: 'sms',
+      title: m.direction === 'inbound' ? 'Message Received' : 'Message Sent',
+      description: m.body,
       timestamp: new Date(m.created_at).toLocaleString(),
     })),
-
-    // Calls Mapping
-    calls: (callsRes.data || []).map(c => ({
+    // --- MAP CALLS ---
+    ...(callsRes.data || []).map(c => ({
       id: c.id,
-      direction: c.direction,
-      outcome: c.outcome,
+      type: 'call',
+      title: `${c.direction === 'inbound' ? 'Incoming' : 'Outgoing'} Call`,
+      description: `Outcome: ${c.outcome}. ${c.notes || ''}`,
       timestamp: new Date(c.created_at).toLocaleString(),
-      duration: c.duration || '0 min',
-      notes: c.notes || '',
-    })),
+    }))
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    // Activity Feed (Combining everything chronologically)
-    activity: [
-      ...(notesRes.data || []).map(n => ({
-        id: n.id,
-        type: 'note',
-        title: 'Internal Note',
-        description: n.body,
-        timestamp: new Date(n.created_at).toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        meta: 'Team Note',
-      })),
-      ...(messagesRes.data || []).map(m => ({
-        id: m.id,
-        type: 'sms',
-        title: m.direction === 'inbound' ? 'Lead: Message received' : 'You: Sent message',
-        description: m.body,
-        timestamp: new Date(m.created_at).toLocaleString(),
-      })),
-      ...(callsRes.data || []).map(c => ({
-        id: c.id,
-        type: 'call',
-        title: `Call: ${c.direction}`,
-        description: `Outcome: ${c.outcome}. ${c.notes || ''}`,
-        timestamp: new Date(c.created_at).toLocaleString(),
-      }))
-    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+  // 5. FINAL DATA PAYLOAD
+  const leadData = {
+    ...applicant,
+    name: `${applicant.first_name || ''} ${applicant.last_name || ''}`.trim(),
+    email: applicant.email || "No Email",
+    phone: applicant.mobile || "No Phone",
+    tags: applicant.tags || [],
+    labels: applicant.labels || [],
+    messages: (messagesRes.data || []),
+    calls: (callsRes.data || []),
+    // Pass the combined activity which now contains the notes
+    activity: combinedActivity, 
+    navigation: {
+      prevId,
+      nextId,
+      currentIndex: currentIndex === -1 ? 0 : currentIndex,
+      totalCount: idList.length,
+      bucket: bucket || 'Queue',
+      jobId: jobId || ''
+    }
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[var(--color-background)]">
+    <div className="min-h-screen w-full flex bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <Sidebar />
-
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar
-          title={leadData.name}
-          subtitle={`${leadData.email} · ${leadData.status}`}
-        />
-        <main className="flex-1 p-6 overflow-auto bg-slate-950/50">
+        <Topbar title={leadData.name} subtitle={leadData.email} />
+        <main className="flex-1 p-6 overflow-auto bg-slate-950/50 custom-scrollbar">
           <LeadProfile lead={leadData as any} />
         </main>
       </div>

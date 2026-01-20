@@ -272,9 +272,17 @@ export default function JobPipeline() {
                 drawerData.map((item) => (
                   <div 
                     key={item.id} 
-                    onClick={() => router.push(`/dashboard/leads/${item.id}`)}
-                    className="p-5 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-all group flex flex-col gap-4 cursor-pointer relative"
-                  >
+  onClick={() => {
+    // 1. Get current bucket label (e.g. "Applied") or fallback to "queue"
+    const bucketLabel = activeBucket?.label?.toLowerCase()?.replace(' ', '-') || 'queue';
+    
+    // 2. Get current Job ID or fallback to empty string
+    const jobId = activeBucket?.job?.id || '';
+
+    router.push(`/dashboard/leads/${item.id}?bucket=${bucketLabel}&jobId=${jobId}`);
+  }}
+  className="p-5 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-all group flex flex-col gap-4 cursor-pointer relative"
+>
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
                         {item.first_name?.charAt(0)}{item.last_name?.charAt(0)}
