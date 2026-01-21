@@ -2,7 +2,7 @@
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -64,6 +64,8 @@ function CheckoutForm(props: StripeFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [fetchedDescription, setFetchedDescription] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const signatureDisplayName =
     `${props.firstName ?? ""} ${props.lastName ?? ""}`.trim() || "Authorized Signer";
   
@@ -130,6 +132,27 @@ function CheckoutForm(props: StripeFormProps) {
     }
     getJobDescription();
   }, [props.jobName]);
+
+  useEffect(() => {
+    if (!consentChecked) {
+      setSignatureImage(null);
+      return;
+    }
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#111111";
+    ctx.font = "36px \"Brush Script MT\", \"Segoe Script\", cursive";
+    ctx.textBaseline = "middle";
+    ctx.fillText(signatureDisplayName, 4, height / 2);
+
+    setSignatureImage(canvas.toDataURL("image/png"));
+  }, [consentChecked, signatureDisplayName]);
 
 
   async function handleSubmit(e: React.FormEvent) {
@@ -221,6 +244,7 @@ function CheckoutForm(props: StripeFormProps) {
             utm_id: props.utm_id,
             consentToCharge: consentChecked,
             signatureName: signatureDisplayName,
+            signatureImage: signatureImage,
           })
         });
 
@@ -263,9 +287,13 @@ function CheckoutForm(props: StripeFormProps) {
         {consentChecked && (
           <div className="mt-3 border-t border-gray-200 pt-3">
             <div className="text-[10px] uppercase tracking-wide text-gray-500">Signature</div>
-            <div className="mt-1 text-xl text-gray-900" style={{ fontFamily: "\"Brush Script MT\", \"Segoe Script\", cursive" }}>
-              {signatureDisplayName}
-            </div>
+            {signatureImage ? (
+              <img src={signatureImage} alt="Signature" className="mt-1 h-10 w-auto" />
+            ) : (
+              <div className="mt-1 text-xl text-gray-900" style={{ fontFamily: "\"Brush Script MT\", \"Segoe Script\", cursive" }}>
+                {signatureDisplayName}
+              </div>
+            )}
             <div className="mt-1 text-[10px] text-gray-500">
               Date: {new Date().toLocaleDateString("en-US")}
             </div>
@@ -275,6 +303,7 @@ function CheckoutForm(props: StripeFormProps) {
           </div>
         )}
       </div>
+      <canvas ref={signatureCanvasRef} width={360} height={80} className="hidden" />
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm border border-red-200">{error}</div>}
       <button
         type="submit"

@@ -58,6 +58,7 @@ export async function POST(req: Request) {
       utm_id,
       consentToCharge,
       signatureName,
+      signatureImage,
     } = body;
 
     console.log("UTM Parameters:", {
@@ -91,13 +92,30 @@ export async function POST(req: Request) {
         const signatureY = Math.max(130, height * 0.14);
         const dateX = Math.min(width - 160, leftX + 280);
 
-        lastPage.drawText(signatureDisplayName, {
-          x: leftX,
-          y: signatureY,
-          size: 20,
-          font: signatureFont,
-          color: rgb(0.1, 0.1, 0.1),
-        });
+        if (typeof signatureImage === "string" && signatureImage.startsWith("data:image/png")) {
+          const base64Data = signatureImage.split(",")[1];
+          if (base64Data) {
+            const signatureBytes = Buffer.from(base64Data, "base64");
+            const signaturePng = await pdfDoc.embedPng(signatureBytes);
+            const targetWidth = 200;
+            const scale = targetWidth / signaturePng.width;
+            const targetHeight = signaturePng.height * scale;
+            lastPage.drawImage(signaturePng, {
+              x: leftX,
+              y: signatureY - 2,
+              width: targetWidth,
+              height: targetHeight,
+            });
+          }
+        } else {
+          lastPage.drawText(signatureDisplayName, {
+            x: leftX,
+            y: signatureY,
+            size: 20,
+            font: signatureFont,
+            color: rgb(0.1, 0.1, 0.1),
+          });
+        }
         lastPage.drawText(`Date: ${signatureDate.toLocaleDateString("en-US")}`, {
           x: dateX,
           y: signatureY + 2,
