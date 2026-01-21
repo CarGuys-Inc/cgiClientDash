@@ -52,6 +52,7 @@ export async function POST(req: Request) {
       utm_content,
       utm_term,
       utm_id,
+      consentToCharge,
     } = body;
 
     console.log("UTM Parameters:", {
@@ -107,6 +108,7 @@ export async function POST(req: Request) {
           utm_content,
           utm_term,
           utm_id,
+          consentToCharge: consentToCharge === true,
           // Optional: timestamp for Zap history
           sentAt: new Date().toISOString(),
         }),

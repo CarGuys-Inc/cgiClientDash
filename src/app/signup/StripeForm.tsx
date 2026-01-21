@@ -216,6 +216,7 @@ function CheckoutForm(props: StripeFormProps) {
             utm_content: props.utm_content,
             utm_term: props.utm_term,
             utm_id: props.utm_id,
+            consentToCharge: consentChecked,
           })
         });
 
