@@ -115,8 +115,19 @@ export async function POST(req: Request) {
           await adminClient.storage.createBucket(bucketName, { public: false });
         }
 
+        const rawNameParts = [companyName, firstName, lastName]
+          .filter((part) => typeof part === "string" && part.trim().length > 0)
+          .map((part) =>
+            part
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/(^-|-$)/g, "")
+          );
+        const namePrefix = rawNameParts.length > 0 ? `${rawNameParts.join("-")}-` : "";
+        const datePrefix = signatureDate.toISOString().slice(0, 10);
         const fileKeyBase = stripePaymentId || stripeSubscriptionId || `${Date.now()}`;
-        signedTermsPath = `checkout-consents/${fileKeyBase}.pdf`;
+        signedTermsPath = `checkout-consents/${namePrefix}${datePrefix}-${fileKeyBase}.pdf`;
         console.log("📄 Signed terms upload target:", {
           bucket: bucketName,
           path: signedTermsPath,
