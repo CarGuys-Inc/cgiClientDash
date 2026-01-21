@@ -30,6 +30,7 @@ interface StripeFormProps {
   incomeMax: string | number;
   incomeRate: string;
   subscriptionName: string;
+  amountDue: number;
   
   // --- UPSELL FIELDS ---
   hasUpsell?: boolean; 
@@ -62,6 +63,7 @@ function CheckoutForm(props: StripeFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedDescription, setFetchedDescription] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false);
   
   // 1. Store the secret locally so we don't have to fetch it on click
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -228,9 +230,8 @@ function CheckoutForm(props: StripeFormProps) {
     }
   }
 
-  const buttonText = loading 
-    ? "Processing..." 
-    : (props.hasUpsell ? "Pay Now (Includes Bonus Job)" : "Pay Now & Complete");
+  const buttonText = loading ? "Processing..." : "Authorize & Complete Payment";
+  const formattedAmount = `$${props.amountDue.toFixed(2)}`;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -238,11 +239,29 @@ function CheckoutForm(props: StripeFormProps) {
         <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
       </div>
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm border border-red-200">{error}</div>}
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <label className="flex items-start gap-3 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 accent-black"
+            checked={consentChecked}
+            onChange={(e) => setConsentChecked(e.target.checked)}
+            required
+          />
+          <span>
+            I agree to the{" "}
+            <a href="/terms-of-service" className="underline hover:text-black">Terms of Service</a>{" "}
+            and{" "}
+            <a href="/refund-policy" className="underline hover:text-black">Refund Policy</a>, and I authorize
+            CarGuys Inc. to charge my card {formattedAmount} today to begin my job promotion.
+          </span>
+        </label>
+      </div>
       <button
         type="submit"
         // Disable if loading, or if stripe hasn't loaded yet.
         // We do NOT disable if clientSecret is missing, because handleSubmit has a fallback fetch.
-        disabled={loading || !stripe} 
+        disabled={loading || !stripe || !consentChecked} 
         className={`bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all`}
       >
         {buttonText}
