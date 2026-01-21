@@ -65,6 +65,7 @@ function CheckoutForm(props: StripeFormProps) {
   
   // 1. Store the secret locally so we don't have to fetch it on click
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
   // 2. Pre-Fetch the Payment Intent (Background)
   useEffect(() => {
@@ -89,8 +90,9 @@ function CheckoutForm(props: StripeFormProps) {
         });
         
         const data = await res.json();
-        if (isMounted && data.clientSecret) {
-            setClientSecret(data.clientSecret);
+        if (isMounted) {
+            if (data.clientSecret) setClientSecret(data.clientSecret);
+            if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
         }
       } catch (err) {
         console.error("Background intent creation failed", err);
@@ -151,6 +153,7 @@ function CheckoutForm(props: StripeFormProps) {
          const data = await res.json();
          if (data.error) throw new Error(data.error);
          secret = data.clientSecret;
+         if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
       }
 
       if (!secret) throw new Error("Payment initialization failed.");
@@ -180,6 +183,7 @@ function CheckoutForm(props: StripeFormProps) {
             jobName: props.jobName,
 
             stripePaymentId: paymentIntent.id,
+            stripeSubscriptionId: subscriptionId,
 
             companyPhone: props.companyPhone,   // billing/business
             contactPhone: props.contactPhone,   // ✅ hiring contact
