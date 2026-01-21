@@ -2,7 +2,7 @@
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -64,6 +64,8 @@ function CheckoutForm(props: StripeFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [fetchedDescription, setFetchedDescription] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
+  const signatureDisplayName =
+    `${props.firstName ?? ""} ${props.lastName ?? ""}`.trim() || "Authorized Signer";
   
   // 1. Store the secret locally so we don't have to fetch it on click
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -128,6 +130,7 @@ function CheckoutForm(props: StripeFormProps) {
     }
     getJobDescription();
   }, [props.jobName]);
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -234,8 +237,6 @@ function CheckoutForm(props: StripeFormProps) {
 
   const buttonText = loading ? "Processing..." : "Authorize & Complete Payment";
   const formattedAmount = `$${props.amountDue.toFixed(2)}`;
-  const signatureDisplayName =
-    `${props.firstName ?? ""} ${props.lastName ?? ""}`.trim() || "Authorized Signer";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -253,7 +254,7 @@ function CheckoutForm(props: StripeFormProps) {
           />
           <span>
             I agree to the{" "}
-            <a href="/terms-of-service" className="underline hover:text-black">Terms of Service</a>{" "}
+            <a href="/terms-of-service.pdf" className="underline hover:text-black">Terms of Service</a>{" "}
             and{" "}
             <a href="/refund-policy" className="underline hover:text-black">Refund Policy</a>, and I authorize
             CarGuys Inc. to charge my card {formattedAmount} today to begin my job promotion.
