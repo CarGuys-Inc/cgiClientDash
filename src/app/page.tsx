@@ -1,4 +1,3 @@
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import Link from "next/link";
 
 export default function Home() {
@@ -32,7 +31,6 @@ export default function Home() {
               CarGuys Inc.
             </a>
           </p>
-          <ThemeSwitcher />
         </footer>
       </div>
     </main>
