@@ -67,52 +67,69 @@ export async function POST(req: Request) {
       : "http://127.0.0.1:8000";
     // --- Send to Zapier (non-blocking) ---
     try {
-      await fetch("https://hooks.zapier.com/hooks/catch/12481932/uwnzp6i/", {
+      const zapierUrl = "https://hooks.zapier.com/hooks/catch/12481932/uwnzp6i/";
+      const zapierPayload = {
+        source: "nextjs_checkout",
+        supabaseUserId,
+
+        firstName,
+        lastName,
+        email,
+        contactPhone,
+
+        companyName,
+        companyPhone,
+
+        jobName,
+        incomeMin,
+        incomeMax,
+        incomeRate,
+
+        hasUpsell,
+        upsellJobName,
+        upsellIncomeMin,
+        upsellIncomeMax,
+        upsellIncomeRate,
+
+        stripePaymentId,
+        stripeSubscriptionId,
+        stripe_product_id,
+        subscriptionName,
+        amountPaid,
+
+        // ✅ UTM PAYLOAD
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        consentToCharge: consentToCharge === true,
+        // Optional: timestamp for Zap history
+        sentAt: new Date().toISOString(),
+      };
+      const zapierRes = await fetch(zapierUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          source: "nextjs_checkout",
-          supabaseUserId,
-
-          firstName,
-          lastName,
-          email,
-          contactPhone,
-
-          companyName,
-          companyPhone,
-
-          jobName,
-          incomeMin,
-          incomeMax,
-          incomeRate,
-
-          hasUpsell,
-          upsellJobName,
-          upsellIncomeMin,
-          upsellIncomeMax,
-          upsellIncomeRate,
-
-          stripePaymentId,
-          stripeSubscriptionId,
-          stripe_product_id,
-          subscriptionName,
-          amountPaid,
-
-          // ✅ UTM PAYLOAD
-          utm_source,
-          utm_medium,
-          utm_campaign,
-          utm_content,
-          utm_term,
-          utm_id,
-          consentToCharge: consentToCharge === true,
-          // Optional: timestamp for Zap history
-          sentAt: new Date().toISOString(),
-        }),
+        body: JSON.stringify(zapierPayload),
       });
+      if (!zapierRes.ok) {
+        const zapierBody = await zapierRes.text().catch(() => "");
+        console.error("⚠️ Zapier webhook responded with error", {
+          status: zapierRes.status,
+          statusText: zapierRes.statusText,
+          body: zapierBody,
+        });
+      } else {
+        console.log("⚡ Zapier webhook sent", { status: zapierRes.status });
+      }
+    } catch (zapErr: any) {
+      // DO NOT FAIL THE REQUEST FOR ZAPIER
+      console.error("⚠️ Zapier webhook failed:", zapErr?.message ?? zapErr);
+    }
+
     // 3. Pass them to the external Webhook
     const webhookRes = await fetch(`${API_BASE}/webhook/recruiterflow`, {
       method: "POST",
@@ -165,14 +182,6 @@ export async function POST(req: Request) {
       console.error("❌ Webhook Error:", await webhookRes.text());
       return NextResponse.json({ error: `Backend Error: ${webhookRes.status}` }, { status: 502 });
     }
-
-
-
-    console.log("⚡ Zapier webhook sent");
-  } catch (zapErr: any) {
-    // DO NOT FAIL THE REQUEST FOR ZAPIER
-    console.error("⚠️ Zapier webhook failed:", zapErr.message);
-  }
 
 
     console.log("✅ Project B confirmed receipt.");
