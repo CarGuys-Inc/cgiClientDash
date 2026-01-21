@@ -53,6 +53,7 @@ export async function POST(req: Request) {
       utm_term,
       utm_id,
       consentToCharge,
+      signatureName,
     } = body;
 
     console.log("UTM Parameters:", {
@@ -105,6 +106,7 @@ export async function POST(req: Request) {
         utm_term,
         utm_id,
         consentToCharge: consentToCharge === true,
+        signatureName,
         // Optional: timestamp for Zap history
         sentAt: new Date().toISOString(),
       };
@@ -171,6 +173,8 @@ export async function POST(req: Request) {
         upsellIncomeRate,
 
         stripe_product_id,
+        consentToCharge: consentToCharge === true,
+        signatureName,
 
 
       }),

@@ -64,6 +64,7 @@ function CheckoutForm(props: StripeFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [fetchedDescription, setFetchedDescription] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
+  const [signatureName, setSignatureName] = useState("");
   
   // 1. Store the secret locally so we don't have to fetch it on click
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -217,6 +218,7 @@ function CheckoutForm(props: StripeFormProps) {
             utm_term: props.utm_term,
             utm_id: props.utm_id,
             consentToCharge: consentChecked,
+            signatureName: signatureName.trim(),
           })
         });
 
@@ -238,6 +240,22 @@ function CheckoutForm(props: StripeFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-3 border rounded bg-white">
         <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
+      </div>
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <label className="block text-xs font-semibold text-gray-800 mb-1">
+          Type name to sign
+        </label>
+        <input
+          type="text"
+          value={signatureName}
+          onChange={(e) => setSignatureName(e.target.value)}
+          placeholder="Your full name"
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none"
+          required
+        />
+        <p className="mt-2 text-[10px] text-gray-600">
+          By signing, I acknowledge that this is a non-refundable digital service that begins immediately upon payment.
+        </p>
       </div>
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm border border-red-200">{error}</div>}
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -262,7 +280,7 @@ function CheckoutForm(props: StripeFormProps) {
         type="submit"
         // Disable if loading, or if stripe hasn't loaded yet.
         // We do NOT disable if clientSecret is missing, because handleSubmit has a fallback fetch.
-        disabled={loading || !stripe || !consentChecked} 
+        disabled={loading || !stripe || !consentChecked || signatureName.trim().length === 0} 
         className={`bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all`}
       >
         {buttonText}
