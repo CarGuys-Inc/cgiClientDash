@@ -126,11 +126,28 @@ export async function POST(req: Request) {
 
         const signedPdfBytes = await pdfDoc.save();
         const adminClient = createAdminClient();
+        const supabaseUrl =
+          process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_SUPABASE_URL || "";
+        const hasServiceKey = Boolean(
+          process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        console.log("🔐 Supabase storage auth context:", {
+          hasServiceKey,
+          supabaseHost: supabaseUrl ? new URL(supabaseUrl).host : "unset",
+        });
         const bucketName = "signed-agreements";
 
         const { data: buckets, error: bucketsError } = await adminClient.storage.listBuckets();
+        if (bucketsError) {
+          console.error("⚠️ Signed PDF bucket list failed:", bucketsError);
+        }
         if (!bucketsError && !buckets?.some((bucket) => bucket.name === bucketName)) {
-          await adminClient.storage.createBucket(bucketName, { public: false });
+          const { error: createBucketError } = await adminClient.storage.createBucket(bucketName, {
+            public: false,
+          });
+          if (createBucketError) {
+            console.error("⚠️ Signed PDF bucket create failed:", createBucketError);
+          }
         }
 
         const rawNameParts = [companyName, firstName, lastName]
@@ -158,7 +175,7 @@ export async function POST(req: Request) {
           });
 
         if (uploadError) {
-          console.error("⚠️ Signed PDF upload failed:", uploadError.message);
+          console.error("⚠️ Signed PDF upload failed:", uploadError);
         } else {
           console.log("✅ Signed PDF uploaded", { bucket: bucketName, path: signedTermsPath });
           const { data: signedUrlData, error: signedUrlError } = await adminClient.storage
