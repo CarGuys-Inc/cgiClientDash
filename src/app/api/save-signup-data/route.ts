@@ -314,16 +314,46 @@ export async function POST(req: Request) {
         signatureDate: signatureDateString,
         signedTermsUrl,
         signedTermsPath,
-
+        pdfUrl: signedTermsUrl,
 
       }),
 
     });
 
     if (!webhookRes.ok) {
-      // ... (rest of your error handling logic)
-      console.error("❌ Webhook Error:", await webhookRes.text());
-      return NextResponse.json({ error: `Backend Error: ${webhookRes.status}` }, { status: 502 });
+      const rawBody = await webhookRes.text().catch(() => "");
+      let backendMessage = "";
+      try {
+        const parsed = rawBody ? JSON.parse(rawBody) : null;
+        if (parsed && typeof parsed === "object") {
+          backendMessage =
+            typeof parsed.message === "string" ? parsed.message :
+            typeof parsed.error === "string" ? parsed.error :
+            typeof parsed.detail === "string" ? parsed.detail :
+            "";
+        }
+      } catch {
+        backendMessage = "";
+      }
+
+      const combinedMessage = backendMessage || rawBody || `Backend Error: ${webhookRes.status}`;
+      console.error("❌ Webhook Error:", combinedMessage);
+
+      const isDuplicateCompanySlug =
+        combinedMessage.includes("companies_slug_unique") ||
+        combinedMessage.includes("duplicate key value");
+
+      if (isDuplicateCompanySlug) {
+        return NextResponse.json(
+          { error: "That company name is already in use. Please choose a different company name." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: "We could not complete your setup right now. Please try again in a moment." },
+        { status: 502 }
+      );
     }
 
 
