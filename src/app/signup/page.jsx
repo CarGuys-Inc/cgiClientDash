@@ -310,8 +310,8 @@ export default async function SignupPage({ searchParams }) {
 
                         {/* JOB ROLE */}
                         <div className="space-y-1">
-                            <label className="text-sm font-bold text-gray-900 ml-1">Job Role</label>
-                            <p className="text-[11px] text-gray-500 ml-1 mb-1.5">What specific position are you hiring for?</p>
+                            <label className="text-xl font-bold text-gray-900 ml-1">What Specific Position Are You Hiring For?</label>
+                            <p className="text-[11px] text-gray-500 ml-1 mb-1.5">Select The Job Role</p>
                             <div className="relative">
                                 <select name="job" required defaultValue={job} className="appearance-none border border-gray-300 rounded-lg px-3 py-3 w-full text-sm bg-white focus:border-black focus:ring-1 focus:ring-black outline-none">
                                     <option value="" disabled>Select Job Title*</option>
@@ -325,7 +325,7 @@ export default async function SignupPage({ searchParams }) {
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
                              <div className="flex items-center gap-2 text-gray-900 mb-1">
                                 <MapPinIcon className="w-4 h-4" />
-                                <span className="text-xs font-bold uppercase tracking-wide">Targeting Location</span>
+                                <span className="text-xl font-bold uppercase tracking-wide">ADDRESS FOR THE LOCATION THAT YOU ARE HIRING FOR</span>
                              </div>
                              <p className="text-[11px] text-gray-500 leading-snug">Enter the <strong>exact address</strong> of your shop/office. We use this to find candidates within a 30-mile radius.</p>
                              
@@ -343,7 +343,7 @@ export default async function SignupPage({ searchParams }) {
                         {/* PAY RANGE */}
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2">
                             <div className="flex items-center gap-2 text-gray-900 mb-1">
-                                <span className="text-xs font-bold uppercase tracking-wide">Compensation Range</span>
+                                <span className="text-xs font-bold uppercase tracking-wide">Compensation Range For The Position That You Are Hiring For:</span>
                                 <span className="bg-white border border-gray-200 text-[10px] px-2 py-0.5 rounded-full text-gray-500">Required</span>
                             </div>
                             <p className="text-[11px] text-gray-500 leading-snug mb-2">
