@@ -34,10 +34,12 @@ export async function POST(req: Request) {
     } = body;
 
     const appEnv = process.env.APP_ENV || 'local';
-    const isTestMode = appEnv === 'local' || appEnv === 'staging';
-    const API_BASE = (process.env.NODE_ENV === "production" && appEnv === 'production')
-      ? "https://dashboard.carguysinc.com"
-      : "http://127.0.0.1:8000";
+const isTestMode = appEnv === 'local' || appEnv === 'staging';
+
+// Use localhost ONLY if the env is explicitly 'local'
+const API_BASE = (appEnv === 'local')
+  ? "http://127.0.0.1:8000"
+  : "https://dashboard.carguysinc.com";
 
     // --- LOGIC BLOCK: ADDITIONAL JOB UPGRADE ---
     if (isAdditionalJob) {
