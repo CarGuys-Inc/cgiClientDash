@@ -11,7 +11,7 @@ type Lead = {
   name: string;
   email: string;
   phone: string;
-  source: string;
+  source?: string;
   status: 'New' | 'Working' | 'Hot';
   lastContact: string;
 };
