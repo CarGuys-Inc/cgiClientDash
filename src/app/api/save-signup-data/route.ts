@@ -314,7 +314,6 @@ export async function POST(req: Request) {
         signatureDate: signatureDateString,
         signedTermsUrl,
         signedTermsPath,
-        pdfUrl: signedTermsUrl,
 
       }),
 
