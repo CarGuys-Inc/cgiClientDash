@@ -7,6 +7,12 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function POST(req: Request) {
   try {
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const clientIp = (forwardedFor?.split(",")[0]?.trim()
+      || req.headers.get("x-real-ip")
+      || req.headers.get("cf-connecting-ip")
+      || req.headers.get("true-client-ip")
+      || null);
     // 1. Await the client creation
     const supabase = await createClient(); 
     
@@ -230,6 +236,7 @@ export async function POST(req: Request) {
         stripe_product_id,
         subscriptionName,
         amountPaid,
+        clientIp,
 
         // ✅ UTM PAYLOAD
         utm_source,
@@ -306,6 +313,7 @@ export async function POST(req: Request) {
         upsellIncomeRate,
 
         stripe_product_id,
+        clientIp,
         consentToCharge: consentToCharge === true,
         signatureName: signatureDisplayName,
         signatureDate: signatureDateString,
