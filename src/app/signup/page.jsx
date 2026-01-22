@@ -143,6 +143,9 @@ export default async function SignupPage({ searchParams }) {
   }));
   
   const currentPlan = plans.find((p) => p.priceId === selectedPriceId);
+  const amountDue = currentPlan
+    ? (currentPlan.amount + (hasUpsell ? 59900 : 0)) / 100
+    : 0;
 
   // ---- Job Titles ----
   let jobTitles = [];
@@ -608,6 +611,7 @@ export default async function SignupPage({ searchParams }) {
                         utm_content={utm_content}
                         utm_term={utm_term}
                         utm_id={utm_id}
+                        amountDue={amountDue}
                         />
 
                     </ClientOnly>
