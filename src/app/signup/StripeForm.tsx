@@ -2,7 +2,7 @@
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -98,9 +98,6 @@ function CheckoutForm(props: StripeFormProps) {
         if (isMounted) {
           if (data.clientSecret) setClientSecret(data.clientSecret);
           if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
-        if (isMounted) {
-            if (data.clientSecret) setClientSecret(data.clientSecret);
-            if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
         }
       } catch (err) {
         console.error("Background intent creation failed", err);

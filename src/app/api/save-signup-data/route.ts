@@ -4,7 +4,6 @@ import { readFile } from "fs/promises";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { createClient } from "@/utils/supabase/server"; // Ensure this path is correct for your server client
 import { createAdminClient } from "@/utils/supabase/admin";
-import { createClient } from "@/utils/supabase/server"; 
 
 export async function POST(req: Request) {
   try {
@@ -41,7 +40,6 @@ export async function POST(req: Request) {
       subscriptionName,
 
       stripePaymentId,
-      stripeSubscriptionId,
       stripeSubscriptionId,
       stripe_product_id,
       stripe_price_id,
@@ -302,8 +300,6 @@ export async function POST(req: Request) {
         stripeSubscriptionId,
 
         hasUpsell,
- <--- FORWARDED TO WEBHOOK
-
         upsellJobName,
         upsellIncomeMin, 
         upsellIncomeMax, 
@@ -315,8 +311,6 @@ export async function POST(req: Request) {
         signatureDate: signatureDateString,
         signedTermsUrl,
         signedTermsPath,
-
-        stripe_product_id
       }),
 
     });
@@ -365,4 +359,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Setup system is currently unreachable." }, { status: 500 });
   }
 }
-
