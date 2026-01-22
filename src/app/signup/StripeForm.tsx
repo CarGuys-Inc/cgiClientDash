@@ -30,6 +30,9 @@ interface StripeFormProps {
   incomeMax: string | number;
   incomeRate: string;
   subscriptionName: string;
+  amountDue: number;
+  
+  // --- UPSELL FIELDS ---
   hasUpsell?: boolean; 
   upsellJobName?: string;
   upsellIncomeMin?: string | number;
@@ -60,6 +63,11 @@ function CheckoutForm(props: StripeFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedDescription, setFetchedDescription] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const signatureDisplayName =
+    `${props.firstName ?? ""} ${props.lastName ?? ""}`.trim() || "Authorized Signer";
   
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
@@ -90,6 +98,9 @@ function CheckoutForm(props: StripeFormProps) {
         if (isMounted) {
           if (data.clientSecret) setClientSecret(data.clientSecret);
           if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
+        if (isMounted) {
+            if (data.clientSecret) setClientSecret(data.clientSecret);
+            if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
         }
       } catch (err) {
         console.error("Background intent creation failed", err);
@@ -117,6 +128,28 @@ function CheckoutForm(props: StripeFormProps) {
     }
     getJobDescription();
   }, [props.jobName]);
+
+  useEffect(() => {
+    if (!consentChecked) {
+      setSignatureImage(null);
+      return;
+    }
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#111111";
+    ctx.font = "36px \"Brush Script MT\", \"Segoe Script\", cursive";
+    ctx.textBaseline = "middle";
+    ctx.fillText(signatureDisplayName, 4, height / 2);
+
+    setSignatureImage(canvas.toDataURL("image/png"));
+  }, [consentChecked, signatureDisplayName]);
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -203,6 +236,9 @@ function CheckoutForm(props: StripeFormProps) {
             utm_content: props.utm_content,
             utm_term: props.utm_term,
             utm_id: props.utm_id,
+            consentToCharge: consentChecked,
+            signatureName: signatureDisplayName,
+            signatureImage: signatureImage,
           })
         });
 
@@ -217,20 +253,58 @@ function CheckoutForm(props: StripeFormProps) {
     }
   }
 
-  const buttonText = loading 
-    ? "Processing..." 
-    : (props.hasUpsell ? "Pay Now (Includes Bonus Job)" : "Pay Now & Complete");
+  const buttonText = loading ? "Processing..." : "Authorize & Complete Payment";
+  const formattedAmount = `$${props.amountDue.toFixed(2)}`;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-3 border rounded bg-white">
         <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
       </div>
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <label className="flex items-start gap-3 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 accent-black"
+            checked={consentChecked}
+            onChange={(e) => setConsentChecked(e.target.checked)}
+            required
+          />
+          <span>
+            I agree to the{" "}
+            <a href="/terms-of-service.pdf" className="underline hover:text-black">Terms of Service</a>{" "}
+            and{" "}
+            <a href="/refund-policy" className="underline hover:text-black">Refund Policy</a>, and I authorize
+            CarGuys Inc. to charge my card {formattedAmount} today to begin my job promotion.
+          </span>
+        </label>
+        {consentChecked && (
+          <div className="mt-3 border-t border-gray-200 pt-3">
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Signature</div>
+            {signatureImage ? (
+              <img src={signatureImage} alt="Signature" className="mt-1 h-10 w-auto" />
+            ) : (
+              <div className="mt-1 text-xl text-gray-900" style={{ fontFamily: "\"Brush Script MT\", \"Segoe Script\", cursive" }}>
+                {signatureDisplayName}
+              </div>
+            )}
+            <div className="mt-1 text-[10px] text-gray-500">
+              Date: {new Date().toLocaleDateString("en-US")}
+            </div>
+            <p className="mt-1 text-[10px] text-gray-600">
+              By signing, I acknowledge that this is a non-refundable digital service that begins immediately upon payment.
+            </p>
+          </div>
+        )}
+      </div>
+      <canvas ref={signatureCanvasRef} width={360} height={80} className="hidden" />
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm border border-red-200">{error}</div>}
       <button
         type="submit"
-        disabled={loading || !stripe} 
-        className="bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all"
+        // Disable if loading, or if stripe hasn't loaded yet.
+        // We do NOT disable if clientSecret is missing, because handleSubmit has a fallback fetch.
+        disabled={loading || !stripe || !consentChecked} 
+        className={`bg-black text-white p-3 rounded w-full disabled:opacity-50 font-bold transition-all`}
       >
         {buttonText}
       </button>

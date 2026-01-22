@@ -3,7 +3,6 @@
 import { useState } from "react";
 import DashboardHeader from "@/components/dashboard/dashboard-header";
 import AppSidebar from "@/components/app-sidebar";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 
 export default function DashboardShell({ children, user, company, role, navigation }) {
   const [collapsed, setCollapsed] = useState(false);

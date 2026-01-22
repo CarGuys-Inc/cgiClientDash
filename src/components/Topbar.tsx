@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Sun, Moon, Search, LogOut } from "lucide-react";
+import React from "react";
+import { Search, LogOut } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 type TopbarProps = {
@@ -10,42 +10,7 @@ type TopbarProps = {
 };
 
 export default function Topbar({ title, subtitle }: TopbarProps) {
-  const [isDark, setIsDark] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const supabase = createClient();
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("theme");
-      if (stored) {
-        setIsDark(stored === "dark");
-      } else {
-        const prefersDark =
-          typeof window !== "undefined" &&
-          window.matchMedia &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setIsDark(
-          document.documentElement.classList.contains("dark") || prefersDark
-        );
-      }
-    } catch (e) {
-      // ignore
-    } finally {
-      setMounted(true);
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    try {
-      if (next) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", next ? "dark" : "light");
-    } catch (e) {
-      // ignore
-    }
-  };
 
   const handleSignOut = async () => {
     try {
@@ -73,22 +38,6 @@ export default function Topbar({ title, subtitle }: TopbarProps) {
             className="pl-9 pr-3 py-2 rounded-lg bg-[var(--color-popover)] text-[var(--color-foreground)] border-[var(--color-border)] text-sm w-48 xl:w-64 focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
           />
         </div>
-
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          aria-label="Toggle color theme"
-          title="Toggle light/dark"
-          className="p-2 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-popover)] transition-colors"
-        >
-          {!mounted ? (
-            <div className="w-5 h-5" />
-          ) : isDark ? (
-            <Sun className="text-[var(--color-foreground)]" size={18} />
-          ) : (
-            <Moon className="text-[var(--color-foreground)]" size={18} />
-          )}
-        </button>
 
         <div className="h-6 w-[1px] bg-[var(--color-border)] mx-1" />
 
