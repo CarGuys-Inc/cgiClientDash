@@ -6,7 +6,7 @@ export interface PipelineData {
 
 /**
  * Fetches the main pipeline data.
- * COMPLETELY DYNAMIC: Stats keys are generated solely from database records.
+ * Updated: Handles JSONB/Array structure for 'visible_to_roles'.
  */
 export const fetchPipelineData = async (supabase: SupabaseClient): Promise<PipelineData> => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -34,10 +34,10 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
       company:companies(id, name, slug),
       applications:job_applications (
         id,
-        status_bucket:applicant_pipeline_status_buckets (id, name)
+        status_bucket:applicant_pipeline_status_buckets (id, name, visible_to_roles)
       ),
       applicantPipeline:applicant_pipelines(
-        statusBuckets:applicant_pipeline_status_buckets(id, name)
+        statusBuckets:applicant_pipeline_status_buckets(id, name, visible_to_roles)
       )
     `)
     .eq('company_id', clientCompanyId)
@@ -46,26 +46,39 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
   if (error) throw error;
 
   const formattedJobs = (data || []).map(job => {
-    // 1. Create a dynamic lookup of ALL valid buckets for this job's pipeline
-    // This ensures we show buckets even if they have 0 applicants
     const stats: Record<string, number> = {};
-    const pipelineBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
     
-    pipelineBuckets.forEach((bucket: any) => {
+    // Helper function to check if 'client' is in the roles array safely
+    const isVisibleToClient = (roles: any) => {
+      if (!roles) return false;
+      if (Array.isArray(roles)) {
+        return roles.some(role => String(role).toLowerCase() === 'client');
+      }
+      // Fallback if it's stored as a string instead of an array
+      return String(roles).toLowerCase().includes('client');
+    };
+
+    // 1. Initialize stats for visible buckets
+    const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
+    const visibleBuckets = allBuckets.filter((b: any) => isVisibleToClient(b.visible_to_roles));
+    
+    visibleBuckets.forEach((bucket: any) => {
       stats[bucket.name] = 0; 
     });
 
-    // 2. Populate counts from current applications
+    // 2. Populate counts
     job.applications?.forEach((app: any) => {
       const bucketName = app.status_bucket?.name;
-      if (bucketName !== undefined) {
+      const roles = app.status_bucket?.visible_to_roles;
+      
+      if (bucketName && isVisibleToClient(roles)) {
         stats[bucketName] = (stats[bucketName] || 0) + 1;
       }
     });
 
     return {
       ...job,
-      stats // Object keys are now exactly the names in your DB
+      stats
     };
   });
 
@@ -73,17 +86,22 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
 };
 
 /**
- * Fetches applicants for ANY bucket name passed from the UI.
+ * Fetches applicants for a bucket. 
  */
 export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any, bucketName: string) => {
-  // Find the database ID for the bucket name clicked in the dashboard
   const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
-  const targetBucket = allBuckets.find((b: any) => b.name === bucketName);
+  
+  const isVisibleToClient = (roles: any) => {
+    if (!roles) return false;
+    if (Array.isArray(roles)) return roles.some(role => String(role).toLowerCase() === 'client');
+    return String(roles).toLowerCase().includes('client');
+  };
 
-  if (!targetBucket) {
-    console.error(`Bucket "${bucketName}" not found in pipeline for job ${job.id}`);
-    return [];
-  }
+  const targetBucket = allBuckets.find((b: any) => 
+    b.name === bucketName && isVisibleToClient(b.visible_to_roles)
+  );
+
+  if (!targetBucket) return [];
 
   const { data, error } = await supabase
     .from('job_applications')
@@ -108,13 +126,9 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
 };
 
 /**
- * Move applicant - updates the status_bucket_id for a specific application record
+ * Move applicant
  */
-export const moveApplicantBucket = async (
-  supabase: SupabaseClient, 
-  applicationId: string, 
-  newBucketId: string
-) => {
+export const moveApplicantBucket = async (supabase: SupabaseClient, applicationId: string, newBucketId: string) => {
   const { data, error } = await supabase
     .from('job_applications')
     .update({ status_bucket_id: newBucketId })
@@ -127,7 +141,6 @@ export const moveApplicantBucket = async (
 
 /**
  * Fetches ALL applicants for a company.
- * Status labels (New/Working/Hot) are now derived from the bucket names in DB.
  */
 export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -150,48 +163,47 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
       applicant:applicants (
         id, first_name, last_name, email, mobile, resume_url
       ),
-      status_bucket:applicant_pipeline_status_buckets (name)
+      status_bucket:applicant_pipeline_status_buckets (name, visible_to_roles)
     `)
     .eq('company_id', companyId);
 
   if (error) throw error;
 
-  return (data || []).map((item: any) => {
-    const bucketName = (item.status_bucket?.name || "").toLowerCase();
-    
-    let theme: 'New' | 'Working' | 'Hot' = 'Working';
-    if (bucketName.includes('applied') || bucketName.includes('new')) theme = 'New';
-    if (['interview', 'offer', 'hired'].some(s => bucketName.includes(s))) theme = 'Hot';
+  const isVisibleToClient = (roles: any) => {
+    if (!roles) return false;
+    if (Array.isArray(roles)) return roles.some(role => String(role).toLowerCase() === 'client');
+    return String(roles).toLowerCase().includes('client');
+  };
 
-    return {
-      id: item.applicant.id,
-      name: `${item.applicant.first_name} ${item.applicant.last_name}`,
-      email: item.applicant.email,
-      phone: item.applicant.mobile || "N/A",
-      resume_url: item.applicant.resume_url,
-      status: theme,
-      bucket_name: item.status_bucket?.name, 
-      lastContact: new Date(item.created_at).toLocaleDateString(),
-      company_id: companyId
-    };
-  });
+  return (data || [])
+    .filter((item: any) => isVisibleToClient(item.status_bucket?.visible_to_roles))
+    .map((item: any) => {
+      const bucketName = (item.status_bucket?.name || "").toLowerCase();
+      let theme: 'New' | 'Working' | 'Hot' = 'Working';
+      if (bucketName.includes('applied') || bucketName.includes('new')) theme = 'New';
+      if (['interview', 'offer', 'hired'].some(s => bucketName.includes(s))) theme = 'Hot';
+
+      return {
+        id: item.applicant.id,
+        name: `${item.applicant.first_name} ${item.applicant.last_name}`,
+        email: item.applicant.email,
+        phone: item.applicant.mobile || "N/A",
+        resume_url: item.applicant.resume_url,
+        status: theme,
+        bucket_name: item.status_bucket?.name, 
+        lastContact: new Date(item.created_at).toLocaleDateString(),
+        company_id: companyId
+      };
+    });
 };
 
 /**
  * Updates job posting metadata.
- * Explicitly exported to fix "Attempted import error" in LeadPipeline.tsx.
  */
-export const updateJobInfo = async (
-  supabase: SupabaseClient, 
-  jobId: string, 
-  updates: any
-) => {
+export const updateJobInfo = async (supabase: SupabaseClient, jobId: string, updates: any) => {
   const { data, error } = await supabase
     .from('job_postings')
-    .update({ 
-      ...updates, 
-      updated_at: new Date().toISOString() 
-    })
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', jobId)
     .select();
 
