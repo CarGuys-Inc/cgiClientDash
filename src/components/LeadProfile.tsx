@@ -17,15 +17,15 @@ import {
   ChevronRight,
   ListFilter,
   Loader2,
-  XCircle,
-  Flag
+  XCircle
 } from 'lucide-react';
 import AddNoteForm from './AddNoteForm';
+import SMSWindow from '@/components/SMSWindow'; // Ensure this path is correct
 import { createClient } from '@/utils/supabase/client';
 import { moveApplicantBucket } from '@/services/jobService';
 
 /* ---------- TYPES ---------- */
-export type ActivityItem = { id: string; type: 'note' | 'call' | 'sms' | 'email' | 'status' | 'task'; title: string; description?: string; timestamp: string; meta?: string; };
+export type ActivityItem = { id: string; type: 'note' | 'call' | 'sms' | 'email' | 'status' | 'task'; title: string; description?: string; timestamp: string; meta?: any; };
 export type Message = { id: string; from: 'lead' | 'agent'; channel: 'sms' | 'email'; body: string; timestamp: string; };
 export type CallLog = { id: string; direction: 'inbound' | 'outbound'; outcome: 'answered' | 'missed' | 'voicemail'; timestamp: string; duration: string; notes?: string; };
 export type DocumentItem = { id: string; name: string; type: string; uploadedAt: string; };
@@ -33,6 +33,7 @@ export type DocumentItem = { id: string; name: string; type: string; uploadedAt:
 export type LeadProfileProps = {
   lead: {
     id: string; name: string; status: string; source: string; resume_url?: string; priceRange?: string; journeyStage?: string; tags: string[]; labels: string[]; location?: string; email: string; phone: string; createdAt: string; lastContact: string; nextTask?: string; notes?: string; activity: ActivityItem[]; messages: Message[]; calls: CallLog[]; documents: DocumentItem[];
+    company_id: number; // Added to ensure SMS works
     navigation?: {
       prevId: string | null;
       nextId: string | null;
@@ -47,7 +48,6 @@ export type LeadProfileProps = {
 const TABS = ['Timeline', 'Notes', 'Messages', 'Calls', 'Documents'] as const;
 type Tab = (typeof TABS)[number];
 
-// Standardized stages as requested
 const HIRING_STAGES = [
   { id: 'applied', label: 'Applied' },
   { id: 'qualified', label: 'Qualified' },
@@ -62,16 +62,14 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Timeline');
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
+  const [showSMSModal, setShowSMSModal] = useState(false); // SMS Modal State
   const [movingTo, setMovingTo] = useState<string | null>(null);
-  
-  // Local state for instant "Optimistic" highlight updates
   const [currentStatus, setCurrentStatus] = useState(lead.status);
 
   const nav = lead.navigation || {
     prevId: null, nextId: null, currentIndex: 0, totalCount: 0, bucket: 'applied', jobId: ''
   };
 
-  // Sync local status when lead changes (via navigation)
   useEffect(() => {
     setCurrentStatus(lead.status);
   }, [lead.status, lead.id]);
@@ -91,8 +89,6 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
 
   const handleMoveStage = async (stageId: string) => {
     if (movingTo || !nav.jobId) return;
-
-    // Optimistic Update: Update UI instantly
     const originalStatus = currentStatus;
     setCurrentStatus(stageId.replace('-', ' '));
     setMovingTo(stageId);
@@ -110,11 +106,10 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
 
       if (targetBucket) {
         await moveApplicantBucket(supabase, lead.id, targetBucket.id);
-        // Update URL to keep context in sync
         router.push(`/dashboard/leads/${lead.id}?bucket=${stageId}&jobId=${nav.jobId}`, { scroll: false });
         router.refresh(); 
       } else {
-        alert(`Stage "${stageId}" not found in configuration.`);
+        alert(`Stage "${stageId}" not found.`);
         setCurrentStatus(originalStatus);
       }
     } catch (err) {
@@ -130,13 +125,26 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
     else alert('No resume URL found.');
   };
 
-  const onlyNotes = (lead.activity || []).filter(item => item.type === 'note');
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto pb-10">
       
+      {/* --- QUICK SMS MODAL --- */}
+      {showSMSModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
+              <h3 className="font-black text-[10px] uppercase tracking-widest text-blue-600">Quick SMS: {lead.name}</h3>
+              <button onClick={() => setShowSMSModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-2">
+                <SMSWindow applicant={{ id: lead.id, mobile: lead.phone }} companyId={lead.company_id} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- NAVIGATION HEADER --- */}
-      <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all">
+      <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
             <ListFilter size={18} />
@@ -162,13 +170,9 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-6 h-full relative text-slate-900 dark:text-white">
         
-        {showInterviewModal && (
-          <ScheduleInterviewModal leadName={lead.name} onClose={() => setShowInterviewModal(false)} />
-        )}
+        {showInterviewModal && <ScheduleInterviewModal leadName={lead.name} onClose={() => setShowInterviewModal(false)} />}
 
         <section className="space-y-4">
-          
-          {/* --- PROFILE SUMMARY CARD --- */}
           <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 flex flex-col gap-8 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex flex-col gap-1">
@@ -181,7 +185,6 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
                     </div>
                 </div>
 
-                {/* --- MINIMALIST TIMELINE ALIGNED TO THE RIGHT --- */}
                 <div className="relative min-w-[300px] md:min-w-[380px] px-2">
                   <div className="absolute top-[17px] left-8 right-8 h-[2px] bg-slate-100 dark:bg-slate-800 rounded-full" />
                   <div className="relative flex justify-between">
@@ -189,10 +192,7 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
                       const statusNorm = (currentStatus || '').toLowerCase();
                       const stageMatch = stage.id.replace('-', ' ');
                       const isCurrent = statusNorm.includes(stageMatch);
-                      
                       const isRejected = stage.id === 'not-qualified';
-                      const isPending = movingTo === stage.id;
-
                       return (
                         <div key={stage.id} className="flex flex-col items-center group">
                           <button
@@ -200,23 +200,13 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
                             disabled={!!movingTo}
                             className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 border-[3px] shadow-sm ${
                               isCurrent 
-                                ? (isRejected ? 'bg-red-600 border-white dark:border-slate-900 scale-110' : 'bg-orange-600 border-white dark:border-slate-900 scale-110')
-                                : 'bg-slate-200 dark:bg-slate-700 border-white dark:border-slate-900 hover:bg-slate-300 dark:hover:bg-slate-600'
+                                ? (isRejected ? 'bg-red-600 border-white dark:border-slate-900' : 'bg-orange-600 border-white dark:border-slate-900')
+                                : 'bg-slate-200 dark:bg-slate-700 border-white dark:border-slate-900 hover:bg-slate-300'
                             }`}
                           >
-                            {isPending ? (
-                              <Loader2 size={16} className="animate-spin text-white" />
-                            ) : isRejected ? (
-                              <XCircle size={16} className={isCurrent ? 'text-white' : 'text-slate-500'} />
-                            ) : (
-                              <CheckCircle2 size={16} className={isCurrent ? 'text-white' : 'text-slate-500'} />
-                            )}
+                            {movingTo === stage.id ? <Loader2 size={16} className="animate-spin text-white" /> : <CheckCircle2 size={16} className={isCurrent ? 'text-white' : 'text-slate-500'} />}
                           </button>
-                          <span className={`mt-3 text-[11px] font-bold uppercase tracking-wide transition-colors ${
-                            isCurrent ? 'text-slate-900 dark:text-white' : 'text-slate-400 group-hover:text-slate-600'
-                          }`}>
-                            {stage.label}
-                          </span>
+                          <span className={`mt-3 text-[11px] font-bold uppercase tracking-wide ${isCurrent ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>{stage.label}</span>
                         </div>
                       );
                     })}
@@ -225,11 +215,7 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
             </div>
 
             <div className="flex flex-wrap gap-2 pt-6 border-t border-slate-50 dark:border-slate-800/50">
-              <span className={`inline-flex items-center rounded-lg px-3 py-1 font-black uppercase tracking-tighter border text-[10px] ${
-                (currentStatus || '').toLowerCase().includes('not qualified') 
-                ? 'bg-red-500/10 text-red-600 border-red-500/20' 
-                : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-              }`}>
+              <span className={`inline-flex items-center rounded-lg px-3 py-1 font-black uppercase tracking-tighter border text-[10px] ${ (currentStatus || '').toLowerCase().includes('not qualified') ? 'bg-red-500/10 text-red-600 border-red-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' }`}>
                 {currentStatus || 'Applied'}
               </span>
               {(lead.tags || []).map((tag) => (
@@ -239,9 +225,8 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
             </div>
           </div>
 
-          {/* --- NOTE FORM --- */}
           {showNoteForm && (
-            <div className="rounded-2xl border border-blue-500/30 bg-blue-50 dark:bg-blue-500/5 p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="rounded-2xl border border-blue-500/30 bg-blue-50 dark:bg-blue-500/5 p-4 animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wider flex items-center gap-2"><StickyNote size={14} /> New Internal Note</h3>
                 <button onClick={() => setShowNoteForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
@@ -250,53 +235,42 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
             </div>
           )}
 
-          {/* --- ACTIVITY TABS --- */}
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 flex flex-col min-h-[520px] shadow-sm overflow-hidden text-slate-900 dark:text-white">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 flex flex-col min-h-[520px] shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/50 dark:bg-slate-900/40">
               <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-950 p-1 border border-slate-200">
                 {TABS.map((tab) => (
-                  <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${activeTab === tab ? 'bg-white dark:bg-slate-100 text-slate-900 font-bold shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>{tab}</button>
+                  <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1.5 text-xs rounded-md transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-100 text-slate-900 font-bold shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'}`}>{tab}</button>
                 ))}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               {activeTab === 'Timeline' && <TimelineView activity={lead.activity} />}
-              {activeTab === 'Notes' && <NotesView notes={onlyNotes} />}
-              {activeTab === 'Messages' && <MessagesView messages={lead.messages} />}
+              {activeTab === 'Notes' && <NotesView notes={lead.activity.filter(a => a.type === 'note')} />}
+              {activeTab === 'Messages' && <SMSWindow applicant={{ id: lead.id, mobile: lead.phone }} companyId={lead.company_id} />}
               {activeTab === 'Calls' && <CallsView calls={lead.calls} />}
               {activeTab === 'Documents' && <DocumentsView documents={lead.documents} />}
             </div>
           </div>
         </section>
 
-        {/* --- SIDEBAR --- */}
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-5 space-y-3 shadow-sm transition-colors">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-5 space-y-3 shadow-sm">
             <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-black">Contact Info</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex flex-col">
-                <span className="text-slate-400 text-[10px] uppercase font-black tracking-widest">Email</span>
-                <span className="text-slate-700 dark:text-slate-200 truncate font-bold">{lead.email}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-slate-400 text-[10px] uppercase font-black tracking-widest">Phone</span>
-                <span className="text-slate-700 dark:text-slate-200 font-bold">{lead.phone}</span>
-              </div>
+              <div className="flex flex-col"><span className="text-slate-400 text-[10px] uppercase font-black tracking-widest">Email</span><span className="text-slate-700 dark:text-slate-200 truncate font-bold">{lead.email}</span></div>
+              <div className="flex flex-col"><span className="text-slate-400 text-[10px] uppercase font-black tracking-widest">Phone</span><span className="text-slate-700 dark:text-slate-200 font-bold">{lead.phone}</span></div>
             </div>
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Applied {lead.createdAt}</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-5 space-y-3 shadow-sm transition-colors">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/70 p-5 space-y-3 shadow-sm">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Quick Actions</h3>
             <div className="flex flex-col gap-2.5">
               <button className="w-full px-4 py-2.5 text-xs rounded-xl bg-emerald-500 text-white font-black hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98]"><Phone size={14} /> CALL NOW</button>
               
-              <button 
-                onClick={() => setShowNoteForm(!showNoteForm)} 
-                className={`w-full px-4 py-2.5 text-xs rounded-xl font-black transition-all flex items-center justify-center gap-2 border ${showNoteForm ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-white border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
-              ><StickyNote size={14} /> {showNoteForm ? 'CANCEL NOTE' : 'LOG A NOTE'}</button>
+              <button onClick={() => setShowNoteForm(!showNoteForm)} className={`w-full px-4 py-2.5 text-xs rounded-xl font-black transition-all flex items-center justify-center gap-2 border ${showNoteForm ? 'bg-slate-900 text-white' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-white border-slate-200 dark:border-slate-700'}`}><StickyNote size={14} /> {showNoteForm ? 'CANCEL NOTE' : 'LOG A NOTE'}</button>
 
-              <button className="w-full px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-black hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"><MessageSquare size={14} /> SEND SMS</button>
+              <button onClick={() => setShowSMSModal(true)} className="w-full px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-black hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"><MessageSquare size={14} /> SEND SMS</button>
               
               <button className="w-full px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-black hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"><Mail size={14} /> SEND EMAIL</button>
 
@@ -347,22 +321,6 @@ function NotesView({ notes }: { notes: ActivityItem[] }) {
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{note.timestamp}</span>
           </div>
           <p className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap font-medium leading-relaxed">{note.description}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MessagesView({ messages }: { messages: Message[] }) {
-  if (!messages || messages.length === 0) return <EmptyState message="No messages found." />;
-  return (
-    <div className="space-y-4">
-      {messages.map((msg) => (
-        <div key={msg.id} className={`flex ${msg.from === 'agent' ? 'justify-end' : 'justify-start'}`}>
-          <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-md ${msg.from === 'agent' ? 'bg-blue-600 text-white rounded-br-none shadow-blue-500/10' : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-none border border-slate-100 dark:border-slate-700'}`}>
-            <p className="text-xs font-bold leading-relaxed">{msg.body}</p>
-            <div className={`mt-2 text-[9px] font-black uppercase tracking-widest opacity-60 ${msg.from === 'agent' ? 'text-white' : 'text-slate-500'}`}>{msg.channel} • {msg.timestamp}</div>
-          </div>
         </div>
       ))}
     </div>
