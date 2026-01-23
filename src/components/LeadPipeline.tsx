@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import Link from 'next/link';
 import { 
   fetchPipelineData, 
   updateJobInfo, 
@@ -26,11 +25,8 @@ interface Job {
   recruiterflow_id?: string;
   applicantPipeline?: any[];
   company?: { name: string };
-  stats?: {
-    applied: number;
-    qualified: number;
-    notQualified: number;
-  };
+  // Changed to dynamic record to support any number of buckets
+  stats?: Record<string, number>;
 }
 
 interface JobTitleOption {
@@ -49,14 +45,12 @@ export default function JobPipeline() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('OPEN JOBS');
 
-  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddJobModalOpen, setIsAddJobModalOpen] = useState(false);
   const [newJobTitle, setNewJobTitle] = useState('');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Drawer States
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerData, setDrawerData] = useState<any[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
@@ -129,8 +123,8 @@ export default function JobPipeline() {
     setDrawerData([]); 
     
     try {
-      const type = bucketLabel.toLowerCase().replace(/\s+/g, '-');
-      const data = await fetchApplicantsByBucket(supabase, job, type);
+      // DYNAMIC: Passing the exact bucket name from the UI to the service
+      const data = await fetchApplicantsByBucket(supabase, job, bucketLabel);
       setDrawerData(data);
     } catch (err: any) {
       console.error("Fetch Error:", err.message);
@@ -139,7 +133,6 @@ export default function JobPipeline() {
     }
   };
 
-  // FIX: Passing applicationId instead of applicantId to isolate the specific job application
   const handleMove = async (e: React.ChangeEvent<HTMLSelectElement>, applicationId: string, newBucketId: string) => {
     e.stopPropagation();
     if (!newBucketId) return;
@@ -147,11 +140,7 @@ export default function JobPipeline() {
     setMovingId(applicationId); 
     try {
       await moveApplicantBucket(supabase, applicationId, newBucketId);
-      
-      // Remove only this specific application from the current drawer view
       setDrawerData(prev => prev.filter(a => a.application_id !== applicationId));
-      
-      // Refresh the background stats
       const data = await fetchPipelineData(supabase);
       setJobs(data.jobs || []);
     } catch (err) {
@@ -254,24 +243,26 @@ export default function JobPipeline() {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-800 pt-6">
-              <button onClick={() => handleOpenDrawer(job, 'Applied')} className="text-center hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Applied</p>
-                <p className="text-3xl font-black text-slate-900 dark:text-white">{job.stats?.applied || 0}</p>
-              </button>
-              <button onClick={() => handleOpenDrawer(job, 'Qualified')} className="text-center border-x border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Qualified</p>
-                <p className="text-3xl font-black text-blue-600">{job.stats?.qualified || 0}</p>
-              </button>
-              <button onClick={() => handleOpenDrawer(job, 'Not Qualified')} className="text-center hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Not Qualified</p>
-                <p className="text-3xl font-black text-slate-400">{job.stats?.notQualified || 0}</p>
-              </button>
+            {/* DYNAMIC BUCKET GRID */}
+            <div className={`grid gap-2 border-t border-slate-100 dark:border-slate-800 pt-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4`}>
+              {job.stats && Object.entries(job.stats).map(([bucketName, count], index, array) => (
+                <button 
+                  key={bucketName}
+                  onClick={() => handleOpenDrawer(job, bucketName)} 
+                  className={`text-center hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors ${index !== array.length - 1 ? 'border-r border-slate-100 dark:border-slate-800' : ''}`}
+                >
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 truncate px-1">{bucketName}</p>
+                  <p className={`text-3xl font-black ${bucketName.toLowerCase().includes('hired') || bucketName.toLowerCase().includes('qualified') ? 'text-blue-600' : 'text-slate-900 dark:text-white'}`}>
+                    {count || 0}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
         ))}
       </div>
 
+      {/* Drawer Section */}
       <div className={`fixed inset-0 z-[60] transition-all duration-300 ${drawerOpen ? 'visible' : 'invisible'}`}>
         <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setDrawerOpen(false)} />
         <div className={`absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl transition-transform duration-300 transform ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -292,9 +283,10 @@ export default function JobPipeline() {
                   <div 
                     key={item.application_id} 
                     onClick={() => {
-                      const bucketLabel = activeBucket?.label?.toLowerCase()?.replace(/\s+/g, '-') || 'applied';
+                      // Pass original bucket label to URL
+                      const bucketLabel = activeBucket?.label || 'Applied';
                       const jobId = activeBucket?.job?.id || '';
-                      router.push(`/dashboard/leads/${item.id}?bucket=${bucketLabel}&jobId=${jobId}`);
+                      router.push(`/dashboard/leads/${item.id}?bucket=${encodeURIComponent(bucketLabel)}&jobId=${jobId}`);
                     }}
                     className="p-5 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:border-blue-400 transition-all group flex flex-col gap-4 cursor-pointer relative"
                   >
@@ -337,6 +329,7 @@ export default function JobPipeline() {
         </div>
       </div>
 
+      {/* Add Job Modal */}
       {isAddJobModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8 border dark:border-slate-800">
@@ -404,6 +397,7 @@ export default function JobPipeline() {
         </div>
       )}
 
+      {/* Edit Job Modal */}
       {isModalOpen && selectedJob && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8 border dark:border-slate-800">
