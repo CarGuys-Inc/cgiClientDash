@@ -5,8 +5,8 @@ export interface PipelineData {
 }
 
 /**
- * Fetches the main pipeline data based on the job_applications table.
- * Groups applicant counts by job_posting_id and categorizes them into buckets.
+ * Fetches the main pipeline data.
+ * COMPLETELY DYNAMIC: Stats keys are generated solely from database records.
  */
 export const fetchPipelineData = async (supabase: SupabaseClient): Promise<PipelineData> => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -21,7 +21,6 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
   const clientCompanyId = profile?.company_id;
   if (!clientCompanyId) throw new Error("No company associated with this account");
 
-  // Main query: Fetch jobs and their nested applications from the centralized table
   const { data, error } = await supabase
     .from('job_postings')
     .select(`
@@ -47,27 +46,26 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
   if (error) throw error;
 
   const formattedJobs = (data || []).map(job => {
-    const stats = { applied: 0, qualified: 0, notQualified: 0 };
+    // 1. Create a dynamic lookup of ALL valid buckets for this job's pipeline
+    // This ensures we show buckets even if they have 0 applicants
+    const stats: Record<string, number> = {};
+    const pipelineBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
     
-    // Logic: Iterate through applications specific to this job
+    pipelineBuckets.forEach((bucket: any) => {
+      stats[bucket.name] = 0; 
+    });
+
+    // 2. Populate counts from current applications
     job.applications?.forEach((app: any) => {
-      const bucketName = (app.status_bucket?.name || "").toLowerCase();
-
-      const isRejected = ['rejected', 'not qualified', 'archived', 'not interested', 'disqualified', 'declined'].some(s => bucketName.includes(s));
-      const isQualified = !isRejected && ['interview', 'qualified', 'technical', 'offer', 'hired', 'shortlist', 'vetted'].some(s => bucketName.includes(s));
-
-      if (isQualified) {
-        stats.qualified++;
-      } else if (isRejected) {
-        stats.notQualified++;
-      } else {
-        stats.applied++;
+      const bucketName = app.status_bucket?.name;
+      if (bucketName !== undefined) {
+        stats[bucketName] = (stats[bucketName] || 0) + 1;
       }
     });
 
     return {
       ...job,
-      stats
+      stats // Object keys are now exactly the names in your DB
     };
   });
 
@@ -75,25 +73,17 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
 };
 
 /**
- * Fetches applicants for a specific bucket category (Applied/Qualified/Rejected)
- * querying directly from the job_applications table.
+ * Fetches applicants for ANY bucket name passed from the UI.
  */
-export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any, bucketType: string) => {
+export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any, bucketName: string) => {
+  // Find the database ID for the bucket name clicked in the dashboard
   const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
-  
-  const targetBucketIds = allBuckets
-    .filter((b: any) => {
-      const name = b.name.toLowerCase();
-      const isRejected = ['rejected', 'not qualified', 'archived', 'not interested', 'disqualified', 'declined'].some(s => name.includes(s));
-      const isQualified = !isRejected && ['interview', 'qualified', 'technical', 'offer', 'hired', 'shortlist', 'vetted'].some(s => name.includes(s));
-      
-      if (bucketType === 'qualified') return isQualified;
-      if (bucketType === 'not-qualified') return isRejected;
-      return !isQualified && !isRejected;
-    })
-    .map((b: any) => b.id);
+  const targetBucket = allBuckets.find((b: any) => b.name === bucketName);
 
-  if (targetBucketIds.length === 0) return [];
+  if (!targetBucket) {
+    console.error(`Bucket "${bucketName}" not found in pipeline for job ${job.id}`);
+    return [];
+  }
 
   const { data, error } = await supabase
     .from('job_applications')
@@ -105,7 +95,7 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
       )
     `)
     .eq('job_posting_id', job.id)
-    .in('status_bucket_id', targetBucketIds)
+    .eq('status_bucket_id', targetBucket.id) 
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -118,19 +108,17 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
 };
 
 /**
- * Moves an applicant to a new bucket by updating a specific record in job_applications.
- * We must use the 'id' (application record ID) rather than 'applicant_id'
- * to prevent moving the user across multiple different job postings.
+ * Move applicant - updates the status_bucket_id for a specific application record
  */
 export const moveApplicantBucket = async (
   supabase: SupabaseClient, 
-  applicationId: string, // Change name to be clear
+  applicationId: string, 
   newBucketId: string
 ) => {
   const { data, error } = await supabase
     .from('job_applications')
     .update({ status_bucket_id: newBucketId })
-    .eq('id', applicationId) // FIX: Use 'id' of the application record
+    .eq('id', applicationId)
     .select();
 
   if (error) throw error;
@@ -138,7 +126,8 @@ export const moveApplicantBucket = async (
 };
 
 /**
- * Fetches ALL applicants for a company across all their job postings.
+ * Fetches ALL applicants for a company.
+ * Status labels (New/Working/Hot) are now derived from the bucket names in DB.
  */
 export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -169,9 +158,10 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
 
   return (data || []).map((item: any) => {
     const bucketName = (item.status_bucket?.name || "").toLowerCase();
-    let status: 'New' | 'Working' | 'Hot' = 'Working';
-    if (['applied', 'new'].some(s => bucketName.includes(s))) status = 'New';
-    else if (['interview', 'offer', 'vetted', 'hot'].some(s => bucketName.includes(s))) status = 'Hot';
+    
+    let theme: 'New' | 'Working' | 'Hot' = 'Working';
+    if (bucketName.includes('applied') || bucketName.includes('new')) theme = 'New';
+    if (['interview', 'offer', 'hired'].some(s => bucketName.includes(s))) theme = 'Hot';
 
     return {
       id: item.applicant.id,
@@ -179,7 +169,8 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
       email: item.applicant.email,
       phone: item.applicant.mobile || "N/A",
       resume_url: item.applicant.resume_url,
-      status: status,
+      status: theme,
+      bucket_name: item.status_bucket?.name, 
       lastContact: new Date(item.created_at).toLocaleDateString(),
       company_id: companyId
     };
@@ -187,14 +178,23 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
 };
 
 /**
- * Updates job posting metadata
+ * Updates job posting metadata.
+ * Explicitly exported to fix "Attempted import error" in LeadPipeline.tsx.
  */
-export const updateJobInfo = async (supabase: SupabaseClient, jobId: string, updates: any) => {
+export const updateJobInfo = async (
+  supabase: SupabaseClient, 
+  jobId: string, 
+  updates: any
+) => {
   const { data, error } = await supabase
     .from('job_postings')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ 
+      ...updates, 
+      updated_at: new Date().toISOString() 
+    })
     .eq('id', jobId)
     .select();
+
   if (error) throw error;
   return data;
 };

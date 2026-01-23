@@ -20,7 +20,8 @@ import {
   XCircle
 } from 'lucide-react';
 import AddNoteForm from './AddNoteForm';
-import SMSWindow from '@/components/SMSWindow'; // Ensure this path is correct
+import SMSWindow from '@/components/SMSWindow'; 
+import EmailWindow from '@/components/EmailWindow'; 
 import { createClient } from '@/utils/supabase/client';
 import { moveApplicantBucket } from '@/services/jobService';
 
@@ -33,7 +34,7 @@ export type DocumentItem = { id: string; name: string; type: string; uploadedAt:
 export type LeadProfileProps = {
   lead: {
     id: string; name: string; status: string; source: string; resume_url?: string; priceRange?: string; journeyStage?: string; tags: string[]; labels: string[]; location?: string; email: string; phone: string; createdAt: string; lastContact: string; nextTask?: string; notes?: string; activity: ActivityItem[]; messages: Message[]; calls: CallLog[]; documents: DocumentItem[];
-    company_id: number; // Added to ensure SMS works
+    company_id: number;
     navigation?: {
       prevId: string | null;
       nextId: string | null;
@@ -62,7 +63,9 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Timeline');
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
-  const [showSMSModal, setShowSMSModal] = useState(false); // SMS Modal State
+  const [showSMSModal, setShowSMSModal] = useState(false); 
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [messageType, setMessageType] = useState<'sms' | 'email'>('sms');
   const [movingTo, setMovingTo] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState(lead.status);
 
@@ -138,6 +141,21 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
             </div>
             <div className="p-2">
                 <SMSWindow applicant={{ id: lead.id, mobile: lead.phone }} companyId={lead.company_id} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- QUICK EMAIL MODAL --- */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
+              <h3 className="font-black text-[10px] uppercase tracking-widest text-blue-600">Quick Email: {lead.name}</h3>
+              <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
+            </div>
+            <div className="p-2">
+                <EmailWindow applicant={{ id: lead.id, email: lead.email, first_name: lead.name.split(' ')[0] }} companyId={lead.company_id} />
             </div>
           </div>
         </div>
@@ -236,17 +254,30 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
           )}
 
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 flex flex-col min-h-[520px] shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/50 dark:bg-slate-900/40">
+            <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/50 dark:bg-slate-900/40 flex justify-between items-center">
               <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-950 p-1 border border-slate-200">
                 {TABS.map((tab) => (
                   <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1.5 text-xs rounded-md transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-100 text-slate-900 font-bold shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'}`}>{tab}</button>
                 ))}
               </div>
+
+              {activeTab === 'Messages' && (
+                <div className="flex bg-slate-200 dark:bg-slate-800 p-0.5 rounded-lg border dark:border-slate-700">
+                  <button onClick={() => setMessageType('sms')} className={`px-3 py-1 text-[10px] font-black uppercase rounded-md transition-all ${messageType === 'sms' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500'}`}>SMS</button>
+                  <button onClick={() => setMessageType('email')} className={`px-3 py-1 text-[10px] font-black uppercase rounded-md transition-all ${messageType === 'email' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500'}`}>Email</button>
+                </div>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               {activeTab === 'Timeline' && <TimelineView activity={lead.activity} />}
               {activeTab === 'Notes' && <NotesView notes={lead.activity.filter(a => a.type === 'note')} />}
-              {activeTab === 'Messages' && <SMSWindow applicant={{ id: lead.id, mobile: lead.phone }} companyId={lead.company_id} />}
+              
+              {activeTab === 'Messages' && (
+                messageType === 'sms' 
+                  ? <SMSWindow applicant={{ id: lead.id, mobile: lead.phone }} companyId={lead.company_id} />
+                  : <EmailWindow applicant={{ id: lead.id, email: lead.email, first_name: lead.name.split(' ')[0] }} companyId={lead.company_id} />
+              )}
+
               {activeTab === 'Calls' && <CallsView calls={lead.calls} />}
               {activeTab === 'Documents' && <DocumentsView documents={lead.documents} />}
             </div>
@@ -272,7 +303,7 @@ export default function LeadProfile({ lead }: LeadProfileProps) {
 
               <button onClick={() => setShowSMSModal(true)} className="w-full px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-black hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"><MessageSquare size={14} /> SEND SMS</button>
               
-              <button className="w-full px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-black hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"><Mail size={14} /> SEND EMAIL</button>
+              <button onClick={() => setShowEmailModal(true)} className="w-full px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-black hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"><Mail size={14} /> SEND EMAIL</button>
 
               <button onClick={() => setShowInterviewModal(true)} className="w-full px-4 py-2.5 text-xs rounded-xl bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 font-black hover:bg-blue-100 flex items-center justify-center gap-2 transition-all shadow-sm"><Calendar size={14} /> SCHEDULE INTERVIEW</button>
 
