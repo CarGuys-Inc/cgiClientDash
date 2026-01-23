@@ -13,7 +13,7 @@ import {
 import { 
   Search, Plus, Calendar, Loader2, 
   Building2, X, DollarSign, Settings2, Edit3, ChevronRight, 
-  Mail, RefreshCw, Inbox, CreditCard, ShieldCheck, Briefcase
+  Mail, RefreshCw, CreditCard, ShieldCheck, Briefcase
 } from 'lucide-react';
 
 interface Job {
@@ -50,8 +50,8 @@ export default function JobPipeline() {
   const [activeTab, setActiveTab] = useState('OPEN JOBS');
 
   // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false); // Edit Modal
-  const [isAddJobModalOpen, setIsAddJobModalOpen] = useState(false); // Add Job Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddJobModalOpen, setIsAddJobModalOpen] = useState(false);
   const [newJobTitle, setNewJobTitle] = useState('');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,8 +70,6 @@ export default function JobPipeline() {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch Pipeline and Job Titles list in parallel
       const [pipelineRes, titlesRes] = await Promise.all([
         fetchPipelineData(supabase),
         supabase.from('job_titles').select('id, title').order('title', { ascending: true })
@@ -90,28 +88,22 @@ export default function JobPipeline() {
     }
   };
 
-  // HANDLES THE ADDITIONAL JOB PURCHASE FLOW
   const handleAddAdditionalJob = async () => {
     if (!newJobTitle) return alert("Please select a job title");
-    
     try {
       setIsSaving(true);
-      
-      // POST to your backend route to handle Stripe and DB creation
       const response = await fetch('/api/save-signup-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobTitle: newJobTitle,
           isAdditionalJob: true,
-          priceAmount: 59900 // $599.00
+          priceAmount: 59900 
         })
       });
 
       const result = await response.json();
-
       if (!response.ok) {
-        // If Stripe needs SCA or a new card, redirect to checkout/portal
         if (result.requiresAction && result.checkoutUrl) {
           router.push(result.checkoutUrl);
           return;
@@ -121,9 +113,8 @@ export default function JobPipeline() {
 
       setIsAddJobModalOpen(false);
       setNewJobTitle('');
-      await loadInitialData(); // Refresh list to show new job
+      await loadInitialData();
       alert("Success! Your new job pipeline has been created.");
-      
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -148,13 +139,19 @@ export default function JobPipeline() {
     }
   };
 
-  const handleMove = async (e: React.ChangeEvent<HTMLSelectElement>, applicantId: string, newBucketId: string) => {
+  // FIX: Passing applicationId instead of applicantId to isolate the specific job application
+  const handleMove = async (e: React.ChangeEvent<HTMLSelectElement>, applicationId: string, newBucketId: string) => {
     e.stopPropagation();
     if (!newBucketId) return;
-    setMovingId(applicantId);
+    
+    setMovingId(applicationId); 
     try {
-      await moveApplicantBucket(supabase, applicantId, newBucketId);
-      setDrawerData(prev => prev.filter(a => a.id !== applicantId));
+      await moveApplicantBucket(supabase, applicationId, newBucketId);
+      
+      // Remove only this specific application from the current drawer view
+      setDrawerData(prev => prev.filter(a => a.application_id !== applicationId));
+      
+      // Refresh the background stats
       const data = await fetchPipelineData(supabase);
       setJobs(data.jobs || []);
     } catch (err) {
@@ -200,7 +197,6 @@ export default function JobPipeline() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-6 font-sans overflow-x-hidden transition-colors duration-300">
       
-      {/* Search and Tabs */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
           {['OPEN JOBS', 'CLOSED JOBS', 'ALL JOBS'].map((tab) => (
@@ -276,7 +272,6 @@ export default function JobPipeline() {
         ))}
       </div>
 
-      {/* --- APPLICANT DRAWER --- */}
       <div className={`fixed inset-0 z-[60] transition-all duration-300 ${drawerOpen ? 'visible' : 'invisible'}`}>
         <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setDrawerOpen(false)} />
         <div className={`absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl transition-transform duration-300 transform ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -295,7 +290,7 @@ export default function JobPipeline() {
               ) : (
                 drawerData.map((item) => (
                   <div 
-                    key={item.id} 
+                    key={item.application_id} 
                     onClick={() => {
                       const bucketLabel = activeBucket?.label?.toLowerCase()?.replace(/\s+/g, '-') || 'applied';
                       const jobId = activeBucket?.job?.id || '';
@@ -320,9 +315,9 @@ export default function JobPipeline() {
                       <div className="flex-1">
                         <label className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase mb-1 block">Move to Stage</label>
                         <select 
-                          disabled={movingId === item.id}
+                          disabled={movingId === item.application_id}
                           onClick={(e) => e.stopPropagation()} 
-                          onChange={(e) => handleMove(e, item.id, e.target.value)}
+                          onChange={(e) => handleMove(e, item.application_id, e.target.value)}
                           className="w-full bg-slate-50 dark:bg-slate-800 border-none text-[11px] font-bold text-blue-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2 cursor-pointer"
                           value=""
                         >
@@ -332,7 +327,7 @@ export default function JobPipeline() {
                           ))}
                         </select>
                       </div>
-                      {movingId === item.id && <RefreshCw className="w-4 h-4 animate-spin text-blue-500 ml-3 self-end mb-2" />}
+                      {movingId === item.application_id && <RefreshCw className="w-4 h-4 animate-spin text-blue-500 ml-3 self-end mb-2" />}
                     </div>
                   </div>
                 ))
@@ -342,7 +337,6 @@ export default function JobPipeline() {
         </div>
       </div>
 
-      {/* --- ADD ADDITIONAL JOB MODAL --- */}
       {isAddJobModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8 border dark:border-slate-800">
@@ -375,7 +369,6 @@ export default function JobPipeline() {
                 </div>
               </div>
 
-              {/* Pricing Disclosure */}
               <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl p-5 border border-blue-100 dark:border-blue-900/30 space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-black text-xs uppercase tracking-tighter">
@@ -411,7 +404,6 @@ export default function JobPipeline() {
         </div>
       )}
 
-      {/* Existing Edit Modal */}
       {isModalOpen && selectedJob && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8 border dark:border-slate-800">

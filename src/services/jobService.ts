@@ -118,13 +118,19 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
 };
 
 /**
- * Moves an applicant to a new bucket by updating the job_applications record.
+ * Moves an applicant to a new bucket by updating a specific record in job_applications.
+ * We must use the 'id' (application record ID) rather than 'applicant_id'
+ * to prevent moving the user across multiple different job postings.
  */
-export const moveApplicantBucket = async (supabase: SupabaseClient, applicantId: string, newBucketId: string) => {
+export const moveApplicantBucket = async (
+  supabase: SupabaseClient, 
+  applicationId: string, // Change name to be clear
+  newBucketId: string
+) => {
   const { data, error } = await supabase
     .from('job_applications')
     .update({ status_bucket_id: newBucketId })
-    .eq('applicant_id', applicantId)
+    .eq('id', applicationId) // FIX: Use 'id' of the application record
     .select();
 
   if (error) throw error;
