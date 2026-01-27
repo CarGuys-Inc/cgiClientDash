@@ -533,8 +533,14 @@ export default async function SignupPage({ searchParams }) {
 
                             {/* 🟢 ADDED: User Role Title */}
                             <div className="grid grid-cols-2 gap-3">
-                                <NikeInput name="userTitle" placeholder="Your Job Title" defaultValue={userTitle} required />
-                                <NikeInput name="company" placeholder={accountType === 'corporate' ? "Corporate Name" : "Company Name"} defaultValue={company} required />
+                            <NikeInput name="userTitle" placeholder="Your Job Title" defaultValue={userTitle} required />
+                            <NikeInput 
+                              name="company" 
+                              placeholder={accountType === 'corporate' ? "Corporate Name" : "Name Of Company You Are Recruiting For"} 
+                                 defaultValue={company} 
+                                 required
+                              className="text-black placeholder:text-black"
+                            />
                             </div>
 
                             <div className="grid grid-cols-1">
@@ -548,7 +554,7 @@ export default async function SignupPage({ searchParams }) {
                                     className="w-full bg-black text-white hover:bg-gray-800 py-3 rounded-full text-sm font-bold transition-colors shadow-md cursor-pointer"
                                 />
 
-                                <p className="text-[10px] text-center text-gray-500 mt-3">
+                                <p className="text-[10px] text-center text-black-200 mt-3">
                                     You won't be charged until the next step.
                                 </p>
                             </div>
