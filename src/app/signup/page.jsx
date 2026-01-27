@@ -533,14 +533,14 @@ export default async function SignupPage({ searchParams }) {
 
                             {/* 🟢 ADDED: User Role Title */}
                             <div className="grid grid-cols-2 gap-3">
-                            <NikeInput name="userTitle" placeholder="Your Job Title" defaultValue={userTitle} required />
-                            <NikeInput 
-                              name="company" 
-                              placeholder={accountType === 'corporate' ? "Corporate Name" : "Name Of Company You Are Recruiting For"} 
-                                 defaultValue={company} 
-                                 required
-                              className="text-black placeholder:text-black"
-                            />
+                                <NikeInput name="userTitle" placeholder="Your Job Title" defaultValue={userTitle} required />
+                                <NikeInput 
+                                    name="company" 
+                                    placeholder={accountType === 'corporate' ? "Corporate Name" : "Company Name"} 
+                                    defaultValue={company} 
+                                    required
+                                    className="text-black placeholder:text-black"
+                                />
                             </div>
 
                             <div className="grid grid-cols-1">
@@ -731,7 +731,8 @@ async function actionStagePlan(formData) {
 
 async function actionSaveFullProfile(formData) {
   "use server";
-  const sql = require("@/lib/db").default;
+  
+  // Use the top-level 'sql' import rather than dynamic require
   const data = Object.fromEntries(formData.entries());
   
   // FIX: Sanitize UUID by splitting commas if duplicates exist
