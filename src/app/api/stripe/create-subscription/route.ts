@@ -118,6 +118,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       subscriptionId: subscription.id,
       clientSecret: clientSecret,
+      customerId: customerId,
     });
 
   } catch (error: any) {

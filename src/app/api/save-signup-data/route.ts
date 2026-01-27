@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       subscriptionName,
 
       stripePaymentId,
+      stripeCustomerId,
       stripeSubscriptionId,
       stripe_product_id,
       stripe_price_id,
@@ -304,6 +305,7 @@ export async function POST(req: Request) {
         amountPaid, 
         subscriptionName, 
         stripePaymentId,
+        stripeCustomerId,
         stripeSubscriptionId,
 
         hasUpsell,

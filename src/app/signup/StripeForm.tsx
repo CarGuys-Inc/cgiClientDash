@@ -71,6 +71,7 @@ function CheckoutForm(props: StripeFormProps) {
   
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
 
   // 2. Pre-Fetch the Payment Intent & Subscription ID
   useEffect(() => {
@@ -79,6 +80,7 @@ function CheckoutForm(props: StripeFormProps) {
     async function createPaymentIntent() {
       setClientSecret(null);
       setSubscriptionId(null);
+      setStripeCustomerId(null);
       
       if (!props.priceId || !props.email) return;
 
@@ -98,6 +100,7 @@ function CheckoutForm(props: StripeFormProps) {
         if (isMounted) {
           if (data.clientSecret) setClientSecret(data.clientSecret);
           if (data.subscriptionId) setSubscriptionId(data.subscriptionId);
+          if (data.customerId) setStripeCustomerId(data.customerId);
         }
       } catch (err) {
         console.error("Background intent creation failed", err);
@@ -158,6 +161,7 @@ function CheckoutForm(props: StripeFormProps) {
     try {
       let secret = clientSecret;
       let subId = subscriptionId;
+      let customerId = stripeCustomerId;
 
       // Fallback: If pre-fetch hasn't finished, fetch now
       if (!secret) {
@@ -177,6 +181,10 @@ function CheckoutForm(props: StripeFormProps) {
          if (data.subscriptionId) {
            subId = data.subscriptionId;
            setSubscriptionId(data.subscriptionId);
+         }
+         if (data.customerId) {
+           customerId = data.customerId;
+           setStripeCustomerId(data.customerId);
          }
       }
 
@@ -204,6 +212,7 @@ function CheckoutForm(props: StripeFormProps) {
 
             stripePaymentId: paymentIntent.id,
             stripeSubscriptionId: subId,
+            stripeCustomerId: customerId,
             companyPhone: props.companyPhone,   // billing/business
             contactPhone: props.contactPhone,   // ✅ hiring contact
 
