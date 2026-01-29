@@ -16,6 +16,27 @@ import {
   Repeat, Ban, Info, ShieldCheck, CreditCard
 } from 'lucide-react';
 
+// Helper Component for Compensation icon
+function DollarSign({ className, size }: { className?: string, size?: number }) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size || 14} 
+      height={size || 14} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <line x1="12" y1="1" x2="12" y2="23"></line>
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+    </svg>
+  );
+}
+
 interface Job {
   id: string;
   displayTitle: string; 
@@ -63,7 +84,7 @@ export default function JobPipeline() {
 
   useEffect(() => {
     loadInitialData();
-  }, [viewAsId]); // Reload if the view_as param changes
+  }, [viewAsId]);
 
   const loadInitialData = async () => {
     try {
@@ -366,6 +387,7 @@ export default function JobPipeline() {
               </div>
             </div>
 
+            {/* BUCKET GRID */}
             <div className={`grid gap-2 border-t border-slate-100 dark:border-slate-800 pt-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4`}>
               {job.stats && Object.entries(job.stats).map(([bucketName, count], index, array) => (
                 <button 
@@ -384,7 +406,7 @@ export default function JobPipeline() {
         ))}
       </div>
 
-      {/* Drawer */}
+      {/* Drawer Section */}
       <div className={`fixed inset-0 z-[60] transition-all duration-300 ${drawerOpen ? 'visible' : 'invisible'}`}>
         <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setDrawerOpen(false)} />
         <div className={`absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl transition-transform duration-300 transform ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
