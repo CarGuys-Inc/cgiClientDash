@@ -11,21 +11,21 @@ import {
 } from '@/services/jobService';
 import { 
   Search, Plus, Calendar, Loader2, 
-  Building2, X, DollarSign, Settings2, Edit3, ChevronRight, 
-  Mail, RefreshCw, CreditCard, ShieldCheck, Briefcase
+  Building2, X, Edit3, ChevronRight, 
+  Mail, RefreshCw, Briefcase,
+  Repeat, Ban, Info, ShieldCheck, CreditCard
 } from 'lucide-react';
 
 interface Job {
   id: string;
-  title: string;
+  displayTitle: string; // Flattened from job_titles lookup in jobService
   status: string;
   created_at: string;
   income_min?: number;
   income_max?: number;
-  recruiterflow_id?: string;
+  recruiterflow_id?: string; // This maps to recruiterflow_job_id
   applicantPipeline?: any[];
   company?: { name: string };
-  // Changed to dynamic record to support any number of buckets
   stats?: Record<string, number>;
 }
 
@@ -82,6 +82,109 @@ export default function JobPipeline() {
     }
   };
 
+  /**
+   * RE-OPEN JOB LOGIC
+   * Uses proxy to hit Admin Dash open-job endpoint
+   */
+  const handleReopenJob = async (job: Job) => {
+    const confirmed = window.confirm(`Re-open the ${job.displayTitle} pipeline?`);
+    if (!confirmed) return;
+
+    try {
+      setIsSaving(true);
+      const webhookRes = await fetch("/api/reopen-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recruiterflow_job_id: job.recruiterflow_id }),
+      });
+
+      if (!webhookRes.ok) throw new Error("Sync with Admin Dashboard failed.");
+
+      const { error } = await supabase
+        .from('job_postings')
+        .update({ status: 'open' })
+        .eq('id', job.id);
+
+      if (error) throw error;
+
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'open' } : j));
+      alert("Job successfully re-opened.");
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * SWAP JOB LOGIC
+   * Closes current job via webhook then opens add job modal
+   */
+  const handleSwapJob = async (job: Job) => {
+    const confirmed = window.confirm(`Are you sure you want to swap out "${job.displayTitle}"? This will close the current pipeline and let you select a new position.`);
+    if (!confirmed) return;
+
+    try {
+      setIsSaving(true);
+
+      const webhookRes = await fetch("/api/close-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recruiterflow_job_id: job.recruiterflow_id }),
+      });
+
+      if (!webhookRes.ok) throw new Error("Failed to notify Admin Dashboard.");
+
+      const { error } = await supabase
+        .from('job_postings')
+        .update({ status: 'closed' })
+        .eq('id', job.id);
+
+      if (error) throw error;
+
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'closed' } : j));
+      setIsAddJobModalOpen(true);
+      
+    } catch (err: any) {
+      alert("Swap failed: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelJob = async (job: Job) => {
+    const confirmed = window.confirm(`Are you sure you want to close the ${job.displayTitle} pipeline?`);
+    if (!confirmed) return;
+
+    try {
+      setIsSaving(true);
+      const webhookRes = await fetch("/api/close-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recruiterflow_job_id: job.recruiterflow_id }),
+      });
+
+      const result = await webhookRes.json();
+      if (!webhookRes.ok) throw new Error(result.error || "Webhook sync failed.");
+
+      const { error } = await supabase
+        .from('job_postings')
+        .update({ status: 'closed' })
+        .eq('id', job.id);
+
+      if (error) throw error;
+
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'closed' } : j));
+      alert("Job successfully closed and synced with Admin Dashboard.");
+      
+    } catch (err: any) {
+      console.error("Cancel Job Error:", err.message);
+      alert("Error: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleAddAdditionalJob = async () => {
     if (!newJobTitle) return alert("Please select a job title");
     try {
@@ -108,7 +211,6 @@ export default function JobPipeline() {
       setIsAddJobModalOpen(false);
       setNewJobTitle('');
       await loadInitialData();
-      alert("Success! Your new job pipeline has been created.");
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -117,13 +219,12 @@ export default function JobPipeline() {
   };
 
   const handleOpenDrawer = async (job: Job, bucketLabel: string) => {
-    setActiveBucket({ label: bucketLabel, title: job.title, job });
+    setActiveBucket({ label: bucketLabel, title: job.displayTitle, job });
     setDrawerOpen(true);
     setDrawerLoading(true);
     setDrawerData([]); 
     
     try {
-      // DYNAMIC: Passing the exact bucket name from the UI to the service
       const data = await fetchApplicantsByBucket(supabase, job, bucketLabel);
       setDrawerData(data);
     } catch (err: any) {
@@ -155,7 +256,6 @@ export default function JobPipeline() {
     try {
       setIsSaving(true);
       await updateJobInfo(supabase, selectedJob.id, {
-        title: selectedJob.title,
         status: selectedJob.status,
         income_min: selectedJob.income_min,
         income_max: selectedJob.income_max,
@@ -170,22 +270,16 @@ export default function JobPipeline() {
   };
 
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = (job?.title || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (job.displayTitle || "").toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === 'OPEN JOBS') return matchesSearch && job.status === 'open';
     if (activeTab === 'CLOSED JOBS') return matchesSearch && job.status === 'closed';
     return matchesSearch;
   });
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-      <p className="text-sm text-slate-500 font-medium">Synchronizing Pipelines...</p>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-6 font-sans overflow-x-hidden transition-colors duration-300">
       
+      {/* Search and Tabs */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
           {['OPEN JOBS', 'CLOSED JOBS', 'ALL JOBS'].map((tab) => (
@@ -216,7 +310,6 @@ export default function JobPipeline() {
             <Building2 className="w-5 h-5 text-blue-500" /> 
             {companyName ? `${companyName} - Pipelines` : 'Dealership Pipelines'}
           </h2>
-          
           <button 
             onClick={() => setIsAddJobModalOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20 font-bold text-xs flex items-center gap-2 active:scale-95 transition-all"
@@ -228,22 +321,54 @@ export default function JobPipeline() {
         {filteredJobs.map((job) => (
           <div key={job.id} className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 transition-all hover:shadow-md">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-              <div className="space-y-1">
+              <div className="space-y-1 w-full">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">{job.title}</h3>
+                  <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">{job.displayTitle}</h3>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${job.status === 'closed' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-100 text-green-700 border-green-200'}`}>{job.status || 'open'}</span>
+                  
+                  {/* ACTIONS GROUPED NEXT TO TITLE */}
+                  <div className="flex items-center gap-2 ml-2">
+                    <button 
+                        onClick={() => handleSwapJob(job)} 
+                        title="Swap Position" 
+                        className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-1.5 rounded-lg transition-colors"
+                    >
+                      <Repeat size={18} />
+                    </button>
+                    <button 
+                        onClick={() => handleCancelJob(job)} 
+                        title="Close Pipeline" 
+                        disabled={isSaving} 
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Ban size={18} />}
+                    </button>
+                    
+                    {/* BLUE INFO ICON: Re-open if closed, Edit if open */}
+                    <button 
+                        onClick={() => { 
+                          if (job.status === 'closed') handleReopenJob(job);
+                          else { setSelectedJob(job); setIsModalOpen(true); }
+                        }} 
+                        title={job.status === 'closed' ? "Re-open Job" : "Edit Info"} 
+                        className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-0.5 rounded-full transition-colors"
+                    >
+                      <Info size={20} fill="currentColor" stroke="none" />
+                    </button>
+
+                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[8px] font-black text-white hover:bg-blue-600 transition-colors cursor-pointer" title="View in RF">
+                      RF
+                    </div>
+                  </div>
                 </div>
+                
                 <div className="flex items-center gap-4 text-[11px] font-bold text-slate-400">
                   <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Posted: {new Date(job.created_at).toLocaleDateString()}</span>
-                  <span className="flex items-center gap-1 text-blue-500"><DollarSign className="w-3.5 h-3.5" /> Comp: {job.income_min ? `${job.income_min/1000}k - ${job.income_max ? job.income_max/1000 : '?'}k` : 'Not Set'}</span>
                 </div>
               </div>
-              <button onClick={() => { setSelectedJob(job); setIsModalOpen(true); }} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl text-[11px] font-bold border border-slate-200 transition-colors">
-                <Settings2 className="w-4 h-4" /> EDIT JOB INFO
-              </button>
             </div>
 
-            {/* DYNAMIC BUCKET GRID */}
+            {/* BUCKET GRID */}
             <div className={`grid gap-2 border-t border-slate-100 dark:border-slate-800 pt-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4`}>
               {job.stats && Object.entries(job.stats).map(([bucketName, count], index, array) => (
                 <button 
@@ -283,7 +408,6 @@ export default function JobPipeline() {
                   <div 
                     key={item.application_id} 
                     onClick={() => {
-                      // Pass original bucket label to URL
                       const bucketLabel = activeBucket?.label || 'Applied';
                       const jobId = activeBucket?.job?.id || '';
                       router.push(`/dashboard/leads/${item.id}?bucket=${encodeURIComponent(bucketLabel)}&jobId=${jobId}`);
@@ -413,10 +537,11 @@ export default function JobPipeline() {
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Job Title</label>
                  <input 
                    type="text" 
-                   value={selectedJob.title}
-                   onChange={(e) => setSelectedJob({...selectedJob, title: e.target.value})}
-                   className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 font-bold outline-none"
+                   value={selectedJob.displayTitle}
+                   disabled
+                   className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border-none font-bold outline-none opacity-60 cursor-not-allowed"
                  />
+                 <p className="text-[9px] text-slate-400 mt-1 italic">*To change the position, please contact support.</p>
                </div>
 
                <div className="grid grid-cols-2 gap-4">
@@ -458,4 +583,25 @@ export default function JobPipeline() {
       )}
     </div>
   );
+}
+
+/* Helper Component for Compensation icon */
+function DollarSign({ className, size }: { className?: string, size?: number }) {
+    return (
+        <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width={size || 14} 
+            height={size || 14} 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            className={className}
+        >
+            <line x1="12" y1="1" x2="12" y2="23"></line>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+    );
 }
