@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { 
   fetchPipelineData, 
@@ -18,12 +18,12 @@ import {
 
 interface Job {
   id: string;
-  displayTitle: string; // Flattened from job_titles lookup in jobService
+  displayTitle: string; 
   status: string;
   created_at: string;
   income_min?: number;
   income_max?: number;
-  recruiterflow_id?: string; // This maps to recruiterflow_job_id
+  recruiterflow_id?: string;
   applicantPipeline?: any[];
   company?: { name: string };
   stats?: Record<string, number>;
@@ -37,7 +37,11 @@ interface JobTitleOption {
 export default function JobPipeline() {
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   
+  // Get the impersonation ID from URL: ?view_as=101
+  const viewAsId = searchParams.get('view_as');
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [availableTitles, setAvailableTitles] = useState<JobTitleOption[]>([]);
   const [companyName, setCompanyName] = useState<string>('');
@@ -59,13 +63,13 @@ export default function JobPipeline() {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [viewAsId]); // Reload if the view_as param changes
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
       const [pipelineRes, titlesRes] = await Promise.all([
-        fetchPipelineData(supabase),
+        fetchPipelineData(supabase, viewAsId),
         supabase.from('job_titles').select('id, title').order('title', { ascending: true })
       ]);
 
@@ -76,16 +80,12 @@ export default function JobPipeline() {
         setCompanyName(pipelineRes.jobs[0].company.name);
       }
     } catch (err: any) {
-      console.error("Failed to load pipeline data");
+      console.error("Failed to load pipeline data", err);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * RE-OPEN JOB LOGIC
-   * Uses proxy to hit Admin Dash open-job endpoint
-   */
   const handleReopenJob = async (job: Job) => {
     const confirmed = window.confirm(`Re-open the ${job.displayTitle} pipeline?`);
     if (!confirmed) return;
@@ -116,17 +116,12 @@ export default function JobPipeline() {
     }
   };
 
-  /**
-   * SWAP JOB LOGIC
-   * Closes current job via webhook then opens add job modal
-   */
   const handleSwapJob = async (job: Job) => {
     const confirmed = window.confirm(`Are you sure you want to swap out "${job.displayTitle}"? This will close the current pipeline and let you select a new position.`);
     if (!confirmed) return;
 
     try {
       setIsSaving(true);
-
       const webhookRes = await fetch("/api/close-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +139,6 @@ export default function JobPipeline() {
 
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'closed' } : j));
       setIsAddJobModalOpen(true);
-      
     } catch (err: any) {
       alert("Swap failed: " + err.message);
     } finally {
@@ -176,9 +170,7 @@ export default function JobPipeline() {
 
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'closed' } : j));
       alert("Job successfully closed and synced with Admin Dashboard.");
-      
     } catch (err: any) {
-      console.error("Cancel Job Error:", err.message);
       alert("Error: " + err.message);
     } finally {
       setIsSaving(false);
@@ -242,7 +234,7 @@ export default function JobPipeline() {
     try {
       await moveApplicantBucket(supabase, applicationId, newBucketId);
       setDrawerData(prev => prev.filter(a => a.application_id !== applicationId));
-      const data = await fetchPipelineData(supabase);
+      const data = await fetchPipelineData(supabase, viewAsId);
       setJobs(data.jobs || []);
     } catch (err) {
       alert("Failed to move candidate.");
@@ -276,9 +268,26 @@ export default function JobPipeline() {
     return matchesSearch;
   });
 
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+      <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
+      <p className="text-sm text-slate-500 font-medium">Synchronizing Pipelines...</p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-6 font-sans overflow-x-hidden transition-colors duration-300">
       
+      {/* SUPPORT MODE BANNER */}
+      {viewAsId && (
+        <div className="max-w-6xl mx-auto mb-6 bg-amber-500 text-white px-4 py-3 rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-amber-500/20 animate-in slide-in-from-top duration-300">
+           <ShieldCheck className="w-5 h-5" />
+           <span className="text-sm font-black uppercase tracking-widest">
+             Support Mode Active: Viewing as Company ID {viewAsId}
+           </span>
+        </div>
+      )}
+
       {/* Search and Tabs */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -323,28 +332,17 @@ export default function JobPipeline() {
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
               <div className="space-y-1 w-full">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">{job.displayTitle}</h3>
+                  <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 truncate max-w-[60%]">{job.displayTitle}</h3>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${job.status === 'closed' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-100 text-green-700 border-green-200'}`}>{job.status || 'open'}</span>
                   
-                  {/* ACTIONS GROUPED NEXT TO TITLE */}
                   <div className="flex items-center gap-2 ml-2">
-                    <button 
-                        onClick={() => handleSwapJob(job)} 
-                        title="Swap Position" 
-                        className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-1.5 rounded-lg transition-colors"
-                    >
+                    <button onClick={() => handleSwapJob(job)} title="Swap Position" className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-1.5 rounded-lg transition-colors">
                       <Repeat size={18} />
                     </button>
-                    <button 
-                        onClick={() => handleCancelJob(job)} 
-                        title="Close Pipeline" 
-                        disabled={isSaving} 
-                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors disabled:opacity-50"
-                    >
+                    <button onClick={() => handleCancelJob(job)} title="Close Pipeline" disabled={isSaving} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors disabled:opacity-50">
                       {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Ban size={18} />}
                     </button>
                     
-                    {/* BLUE INFO ICON: Re-open if closed, Edit if open */}
                     <button 
                         onClick={() => { 
                           if (job.status === 'closed') handleReopenJob(job);
@@ -368,7 +366,6 @@ export default function JobPipeline() {
               </div>
             </div>
 
-            {/* BUCKET GRID */}
             <div className={`grid gap-2 border-t border-slate-100 dark:border-slate-800 pt-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4`}>
               {job.stats && Object.entries(job.stats).map(([bucketName, count], index, array) => (
                 <button 
@@ -387,7 +384,7 @@ export default function JobPipeline() {
         ))}
       </div>
 
-      {/* Drawer Section */}
+      {/* Drawer */}
       <div className={`fixed inset-0 z-[60] transition-all duration-300 ${drawerOpen ? 'visible' : 'invisible'}`}>
         <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setDrawerOpen(false)} />
         <div className={`absolute right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl transition-transform duration-300 transform ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -410,7 +407,7 @@ export default function JobPipeline() {
                     onClick={() => {
                       const bucketLabel = activeBucket?.label || 'Applied';
                       const jobId = activeBucket?.job?.id || '';
-                      router.push(`/dashboard/leads/${item.id}?bucket=${encodeURIComponent(bucketLabel)}&jobId=${jobId}`);
+                      router.push(`/dashboard/leads/${item.id}?bucket=${encodeURIComponent(bucketLabel)}&jobId=${jobId}${viewAsId ? `&view_as=${viewAsId}` : ''}`);
                     }}
                     className="p-5 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:border-blue-400 transition-all group flex flex-col gap-4 cursor-pointer relative"
                   >
@@ -489,7 +486,7 @@ export default function JobPipeline() {
               <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl p-5 border border-blue-100 dark:border-blue-900/30 space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-black text-xs uppercase tracking-tighter">
-                    <DollarSign className="w-4 h-4" /> Plan Add-on
+                    <CreditCard className="w-4 h-4" /> Plan Add-on
                   </div>
                   <div className="text-blue-600 dark:text-blue-400 font-black text-lg">$599<span className="text-[10px] font-bold">/mo</span></div>
                 </div>
@@ -583,25 +580,4 @@ export default function JobPipeline() {
       )}
     </div>
   );
-}
-
-/* Helper Component for Compensation icon */
-function DollarSign({ className, size }: { className?: string, size?: number }) {
-    return (
-        <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width={size || 14} 
-            height={size || 14} 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            className={className}
-        >
-            <line x1="12" y1="1" x2="12" y2="23"></line>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-        </svg>
-    );
 }

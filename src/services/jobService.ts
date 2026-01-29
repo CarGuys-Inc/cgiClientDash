@@ -5,24 +5,32 @@ export interface PipelineData {
 }
 
 /**
- * Fetches the main pipeline data by joining job_postings with job_titles lookup.
- * Fixes: Array access for joined job_titles and visibility filtering.
+ * Fetches the main pipeline data. 
+ * Supports Support Mode: If admin is logged in and viewAsId is provided, fetches that company instead.
  */
-export const fetchPipelineData = async (supabase: SupabaseClient): Promise<PipelineData> => {
+export const fetchPipelineData = async (
+  supabase: SupabaseClient, 
+  viewAsId?: string | null
+): Promise<PipelineData> => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Authentication required");
 
-  // Get the company_id associated with the logged-in user
-  const { data: profile } = await supabase
-    .from('client_profiles')
-    .select('company_id')
-    .eq('auth_user_id', user.id)
-    .single();
+  let activeCompanyId: string | number;
 
-  const clientCompanyId = profile?.company_id;
-  if (!clientCompanyId) throw new Error("No company associated with this account");
+  // Support Mode Logic
+  if (user.email === 'admin@carguysinc.com' && viewAsId) {
+    activeCompanyId = viewAsId;
+  } else {
+    const { data: profile } = await supabase
+      .from('client_profiles')
+      .select('company_id')
+      .eq('auth_user_id', user.id)
+      .single();
 
-  // Query job_postings and join the job_titles table
+    if (!profile?.company_id) throw new Error("No company associated with this account");
+    activeCompanyId = profile.company_id;
+  }
+
   const { data, error } = await supabase
     .from('job_postings')
     .select(`
@@ -42,12 +50,11 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
         statusBuckets:applicant_pipeline_status_buckets(id, name, visible_to_roles)
       )
     `)
-    .eq('company_id', clientCompanyId)
+    .eq('company_id', activeCompanyId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  // Format the data and calculate stats
   const formattedJobs = (data || []).map(job => {
     const stats: Record<string, number> = {};
     
@@ -59,7 +66,6 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
       return String(roles).toLowerCase().includes('client');
     };
 
-    // 1. Initialize stats for buckets marked visible to the client
     const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
     const visibleBuckets = allBuckets.filter((b: any) => isVisibleToClient(b.visible_to_roles));
     
@@ -67,7 +73,6 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
       stats[bucket.name] = 0; 
     });
 
-    // 2. Populate applicant counts
     job.applications?.forEach((app: any) => {
       const bucketName = app.status_bucket?.name;
       const roles = app.status_bucket?.visible_to_roles;
@@ -77,8 +82,6 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
       }
     });
 
-    // 3. FIX: Flatten the job_titles array into a string
-    // Supabase returns joined rows as an array, so we take the first element.
     const jobTitleObj = job.job_titles as unknown as { title: string }[] | { title: string };
     const titleString = Array.isArray(jobTitleObj) 
       ? jobTitleObj[0]?.title 
@@ -94,9 +97,6 @@ export const fetchPipelineData = async (supabase: SupabaseClient): Promise<Pipel
   return { jobs: formattedJobs };
 };
 
-/**
- * Fetches specific applicants for a bucket within a job pipeline. 
- */
 export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any, bucketName: string) => {
   const allBuckets = job.applicantPipeline?.[0]?.statusBuckets || [];
   
@@ -134,9 +134,6 @@ export const fetchApplicantsByBucket = async (supabase: SupabaseClient, job: any
   }));
 };
 
-/**
- * Updates an applicant's stage in the pipeline.
- */
 export const moveApplicantBucket = async (supabase: SupabaseClient, applicationId: string, newBucketId: string) => {
   const { data, error } = await supabase
     .from('job_applications')
@@ -148,9 +145,6 @@ export const moveApplicantBucket = async (supabase: SupabaseClient, applicationI
   return data;
 };
 
-/**
- * Updates metadata for a job posting.
- */
 export const updateJobInfo = async (supabase: SupabaseClient, jobId: string, updates: any) => {
   const { data, error } = await supabase
     .from('job_postings')
@@ -162,21 +156,23 @@ export const updateJobInfo = async (supabase: SupabaseClient, jobId: string, upd
   return data;
 };
 
-/**
- * Fetches all applicants for a company, filtered by client visibility.
- */
-export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
+export const fetchAllCompanyApplicants = async (supabase: SupabaseClient, viewAsId?: string | null) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data: profile } = await supabase
-    .from('client_profiles')
-    .select('company_id')
-    .eq('auth_user_id', user.id)
-    .single();
+  let activeCompanyId: string | number;
 
-  const companyId = profile?.company_id;
-  if (!companyId) return [];
+  if (user.email === 'admin@carguysinc.com' && viewAsId) {
+    activeCompanyId = viewAsId;
+  } else {
+    const { data: profile } = await supabase
+      .from('client_profiles')
+      .select('company_id')
+      .eq('auth_user_id', user.id)
+      .single();
+    if (!profile?.company_id) return [];
+    activeCompanyId = profile.company_id;
+  }
 
   const { data, error } = await supabase
     .from('job_applications')
@@ -188,7 +184,7 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
       ),
       status_bucket:applicant_pipeline_status_buckets (name, visible_to_roles)
     `)
-    .eq('company_id', companyId);
+    .eq('company_id', activeCompanyId);
 
   if (error) throw error;
 
@@ -215,7 +211,7 @@ export const fetchAllCompanyApplicants = async (supabase: SupabaseClient) => {
         status: theme,
         bucket_name: item.status_bucket?.name, 
         lastContact: new Date(item.created_at).toLocaleDateString(),
-        company_id: companyId
+        company_id: activeCompanyId
       };
     });
 };
