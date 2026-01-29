@@ -162,7 +162,10 @@ function SMSOnboardingSection({ company }: { company: any }) {
       <div className="text-center space-y-4">
         <Clock className="mx-auto text-amber-500" size={48} />
         <h4 className="text-xl font-black">Registration Pending</h4>
-        <p className="text-sm text-slate-500 max-w-sm mx-auto">Twilio is currently vetting your business details. This usually takes 3-5 business days. You will be notified here once approved.</p>
+        <p className="text-sm text-slate-500 max-w-sm mx-auto">
+          Twilio is currently vetting your business details. This usually takes 3-5 business days. 
+          You will be notified here once approved.
+        </p>
       </div>
     );
   }
@@ -171,29 +174,105 @@ function SMSOnboardingSection({ company }: { company: any }) {
     e.preventDefault();
     setLoading(true);
     const data = Object.fromEntries(new FormData(e.target));
+    
+    // Ensure the phone number is in E.164 format (simple version)
+    if (data.repPhone && !String(data.repPhone).startsWith('+')) {
+      data.repPhone = `+1${data.repPhone.toString().replace(/\D/g, '')}`;
+    }
+
     const res = await onboardTwilioCompany(company.id, data);
-    if (res.error) alert(res.error);
-    else window.location.reload(); // Refresh to show pending state
+    if (res.error) {
+      alert(`Onboarding Error: ${res.error}`);
+    } else {
+      window.location.reload();
+    }
     setLoading(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <Smartphone className="text-blue-600" />
-        <h3 className="text-xl font-black">A2P 10DLC Registration</h3>
+    <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-3">
+        <div className="bg-blue-600 p-2 rounded-lg text-white">
+          <Smartphone size={20} />
+        </div>
+        <div>
+          <h3 className="text-xl font-black">A2P 10DLC Registration</h3>
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Carrier Compliance Required</p>
+        </div>
       </div>
-      <p className="text-xs text-slate-500 mb-6">To send SMS, carriers require your legal business info. This process is automated.</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <InputField label="Legal Business Name" name="businessName" required />
-        <InputField label="Tax ID (EIN)" name="ein" placeholder="XX-XXXXXXX" required />
-        <InputField label="Business Website" name="website" placeholder="https://..." required />
-        <InputField label="Business Email" name="email" type="email" required />
+
+      {/* SECTION 1: Business Details */}
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b pb-2">Business Identity</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <InputField label="Legal Business Name" name="businessName" placeholder="As it appears on tax docs" required />
+          <InputField label="Tax ID (EIN)" name="ein" placeholder="12-3456789" required />
+          <SelectField label="Business Type" name="businessType" required options={[
+            "Partnership", "Limited Liability Corporation", "Non Profit Corporation", "Public Corporation", "Private Corporation"
+          ]} />
+          <SelectField label="Industry" name="industry" required options={[
+            "AUTOMOTIVE", "RETAIL", "TECHNOLOGY", "HEALTHCARE", "EDUCATION", "HOSPITALITY"
+          ]} />
+          <InputField label="Business Website" name="website" placeholder="https://www.yourdealership.com" required />
+          <InputField label="Regions of Operation" name="regions" defaultValue="USA_AND_CANADA" disabled />
+        </div>
       </div>
-      <button disabled={loading} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:bg-black">
-        {loading ? <Loader2 className="animate-spin" size={18} /> : 'Submit Compliance Profile'}
+
+      {/* SECTION 2: Physical Address */}
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b pb-2">Physical Address (No P.O. Boxes)</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <InputField label="Street Address" name="street" required />
+          </div>
+          <InputField label="City" name="city" required />
+          <div className="grid grid-cols-2 gap-4">
+            <InputField label="State / Province" name="state" placeholder="NY" required />
+            <InputField label="Zip / Postal Code" name="zipcode" required />
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3: Authorized Representative */}
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b pb-2">Authorized Representative</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <InputField label="First Name" name="repFirstName" required />
+          <InputField label="Last Name" name="repLastName" required />
+          <InputField label="Email Address" name="repEmail" type="email" required />
+          <InputField label="Mobile Phone" name="repPhone" placeholder="555-123-4567" required />
+          <InputField label="Business Title" name="repTitle" placeholder="Owner" required />
+          <InputField label="Job Position" name="repPosition" placeholder="CEO" required />
+        </div>
+      </div>
+
+      <button 
+        disabled={loading} 
+        className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all hover:bg-black hover:shadow-xl disabled:opacity-50"
+      >
+        {loading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+        Submit for Official Review
       </button>
     </form>
+  );
+}
+
+/* --- REUSABLE SELECT --- */
+function SelectField({ label, name, options, required }: any) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">{label}</label>
+      <select 
+        name={name} 
+        required={required}
+        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl p-4 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white appearance-none"
+      >
+        <option value="">Select {label}...</option>
+        {options.map((opt: string) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    </div>
   );
 }
 
