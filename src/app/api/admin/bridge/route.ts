@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
-  // 1. Define CORS headers
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*', // For production, replace '*' with your Admin URL
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://dashboard.carguysinc.com',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-ADMIN-SECRET',
+  'Vary': 'Origin',
+};
 
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyId = searchParams.get('company_id');
   const adminSecret = searchParams.get('secret');
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   // 2. Security Check
   if (adminSecret !== process.env.ADMIN_SHARED_SECRET) {
     return NextResponse.json(
-      { error: "Unauthorized" }, 
+      { error: "Unauthorized" },
       { status: 401, headers: corsHeaders }
     );
   }
@@ -58,11 +58,5 @@ export async function GET(request: Request) {
 
 // Handle preflight OPTIONS request
 export async function OPTIONS() {
-  return NextResponse.json({}, { 
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    } 
-  });
+  return NextResponse.json({}, { headers: corsHeaders });
 }
